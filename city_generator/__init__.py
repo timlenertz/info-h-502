@@ -6,10 +6,13 @@ bl_info = {
 	'category' : "Object"	
 }
 
-modules = ['City', 'Terrain']
+if 'bpy' in locals():
+	import imp
+	imp.reload(city)
+else:
+	from . import city
 
 import bpy
-from . import city
 
 class CityGeneratorPanel(bpy.types.Panel):
 	bl_label = "City Generator"
@@ -28,7 +31,7 @@ class OBJECT_OT_GenerateCity(bpy.types.Operator):
 	bl_description = "Generate city with given parameters."
 
 	def execute(self, context):
-		cit = city.City(5)
+		cit = city.City()
 		cit.generate()
 		city_root = cit.create_blender_object()
 		bpy.context.scene.objects.link(city_root)
