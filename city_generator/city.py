@@ -1,6 +1,63 @@
 import numpy as np
 import random
 import bpy
+import math
+import scipy.spatial
+
+
+class PrimaryRoadNetwork:
+	number_of_intersections = 3
+
+	def __init__(self, terrain):
+		self.terrain = terrain
+	
+
+	def __choose_intersection_points(self):
+		"""Choose points on terrain for primary road intersections."""
+		# Subdivide terrain into grid where cell side length is power of 2
+		# such that there are at least as many cells as intersections  
+		depth = int(math.ceil(math.log(self.number_of_intersections, 4)))
+		side_number_of_cells = 2**depth
+		number_of_cells = side_number_of_cells**2
+		assert number_of_cells >= self.number_of_intersections
+		cell_side_length = 1.0 / side_number_of_cells
+		
+		def cell_center(i):
+			x = i % side_number_of_cells
+			y = i // side_number_of_cells
+			center_x = cell_side_length/2.0 + x*cell_side_length
+			center_y = cell_side_length/2.0 + y*cell_side_length
+			return (center_x, center_y)
+		
+		# Randomly choose cells that will contain intersection
+		intersection_cells = []
+		for i in range(self.number_of_intersections):
+			cell = random.randint(0, number_of_cells - 1)
+			if cell in intersection_cells:
+				continue
+			intersection_cells.append(cell)
+		
+		# Randomly place intersection points in these cells
+		self.intersection_points = []
+		for c in intersection_cells:
+			center_x, center_y = cell_center(c)
+			sigma = cell_side_length / 7.0
+			x = random.normalvariate(center_x, sigma)
+			y = random.normalvariate(center_y, sigma)
+			self.intersection_points.append((x, y))
+		
+	
+	def __connect_intersection_points(self):
+		"""Generate road segments joining the intersection points."""
+		triangulation = scipy.spatial.Delaunay(self.intersection_points, qhull_options='Qbb Qc Qz QJ')
+		
+		
+	
+	def generate(self):
+		self.__choose_intersection_points()
+	
+
+
 
 class Terrain:
 	"""Generates random terrain height map, using diamond-square algorithm."""
