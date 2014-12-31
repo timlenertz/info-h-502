@@ -9,8 +9,10 @@ bl_info = {
 if 'bpy' in locals():
 	import imp
 	imp.reload(city)
+	imp.reload(plan)
+	imp.reload(terrain)
 else:
-	from . import city
+	from . import city, plan, terrain
 
 import bpy
 
