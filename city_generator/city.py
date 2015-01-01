@@ -3,15 +3,16 @@ import random
 import math
 import bpy
 
-from . import terrain, plan
+from . import plan, terrain
 
 class City:
 	def __init__(self):
-		self.terrain = Terrain()
-		self.plan = Plan(terrain)
+		self.terrain = terrain.Terrain()
+		self.plan = plan.Plan(self.terrain)
 	
 	def generate(self):
 		self.terrain.generate()
+		self.plan.generate()
 	
 	def create_blender_object(self, name="City"):
 		scene = bpy.context.scene
@@ -20,10 +21,11 @@ class City:
 		root = bpy.data.objects.new(name=name, object_data=None)
 		
 		# Terrain
-		scale = (20.0, 20.0, 1.0)
-		terrain_mesh = self.terrain.create_blender_mesh(scale)
+		terrain_mesh = self.terrain.create_blender_mesh((1.0, 1.0, 1.0))
 		terrain_obj = bpy.data.objects.new("Terrain", terrain_mesh)
 		terrain_obj.parent = root
 		scene.objects.link(terrain_obj)
+		
+		self.plan.primary_road_network.create_blender_roads()
 		
 		return root

@@ -7,11 +7,11 @@ import bpy
 
 class Plan:
 	"""Plan of the city, consisting of road map and outlines for buildings."""
-	def __init__(self, terrain):
-		self.terrain = terrain
-		self.primary_road_network = PrimaryRoadNetwork(terrain)
+	def __init__(self, ter):
+		self.terrain = ter
+		self.primary_road_network = PrimaryRoadNetwork(ter)
 	
-	def generate():
+	def generate(self):
 		self.terrain.generate()
 		self.primary_road_network.generate()
 
@@ -185,7 +185,30 @@ class PrimaryRoadNetwork:
 					road = self.__create_road(a, b)
 					key = str(a) + ' ' + str(b)
 					self.roads[key] = road
+	
+
+	def __create_blender_polyline_for_road(self, name, road):
+		curve = bpy.data.curves.new(name=name, type='CURVE')
+		curve.dimensions = '3D'
 		
+		polyline = curve.splines.new('POLY')
+		polyline.points.add(len(road) - 1)
+		i = 0
+		for x, y in road:
+			z = self.terrain.height_at(x, y)
+			polyline.points[i].co = (x, y, z, 1.0)
+			i = i + 1
+				
+		return curve
+		
+	def create_blender_roads(self):
+		for key in self.roads:
+			road = self.roads[key]
+			curve = self.__create_blender_polyline_for_road("road_curve", road)
+			
+			obj = bpy.data.objects.new("road_curve_obj", curve)
+			bpy.context.scene.objects.link(obj)
+			
 	def generate(self):
 		self.__choose_intersection_points()
 		self.__create_high_level_graph()

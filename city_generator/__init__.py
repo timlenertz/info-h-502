@@ -6,6 +6,8 @@ bl_info = {
 	'category' : "Object"	
 }
 
+__all__ = ['city', 'plan', 'terrain']
+
 if 'bpy' in locals():
 	import imp
 	imp.reload(city)
