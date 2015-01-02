@@ -21,100 +21,75 @@ class Plan:
 
 class PrimaryRoadNetwork:
 	"""High and low level primary road network, generated randomly. Roads are shaped based on terrain."""
-	number_of_intersection_points = 10
-	maximal_removed_edges = 10
-	edges_deviation = 20.0
+	min_number_of_intersection_points = 10
+	edges_deviation = 8.0
 
-	road_step_distance = 5.0
+	road_step_distance = 10.0
 	road_number_of_samples = 15
-	road_snap_distance = 1.0
+	road_snap_distance = 15.0
 	road_deviation_angle = math.radians(10.0)
 
 
 	def __init__(self, terrain):
 		self.terrain = terrain
+		
 	
-	def __choose_intersection_points(self):
+	def __create_high_level_graph(self):
 		# Subdivide terrain into grid where cell side length is power of 2
 		# such that there are at least as many cells as points 
-		n = self.number_of_intersection_points
+		n = self.min_number_of_intersection_points
 		depth = int(math.ceil(math.log(n, 4)))
 		side_number_of_cells = 2**depth
 		number_of_cells = side_number_of_cells**2
 		assert number_of_cells >= n
 		cell_side_length = self.terrain.width / side_number_of_cells
-		def cell_center(i):
+		
+		def cell_coordinates(i):
 			x = i % side_number_of_cells
 			y = i // side_number_of_cells
+			return (x, y)
+			
+		def cell_center(x, y):
 			center_x = cell_side_length/2.0 + x*cell_side_length
 			center_y = cell_side_length/2.0 + y*cell_side_length
 			return (center_x, center_y)
 		
-		# Randomly choose cells that will contain intersection
-		intersection_cells = []
-		for i in range(n):
-			cell = random.randint(0, number_of_cells - 1)
-			while cell in intersection_cells:
-				cell = random.randint(0, number_of_cells - 1)
-			intersection_cells.append(cell)
-		
-		# Randomly place intersection points in these cells
-		self.intersection_points = []
-		for c in intersection_cells:
-			center_x, center_y = cell_center(c)
-			sigma = cell_side_length / self.edges_deviation
-			x = random.normalvariate(center_x, sigma)
-			y = random.normalvariate(center_y, sigma)
-			self.intersection_points.append((x, y))
-			
-		
-	
-	def __create_high_level_graph(self):
-		# Create delaunay triangulation
-		triangulation = scipy.spatial.Delaunay(self.intersection_points)
-		self.adjacency = []
-		indices, indptr = triangulation.vertex_neighbor_vertices
-		for k in range(self.number_of_intersection_points):
-			neighboring = indptr[indices[k]:indices[k+1]]
-			self.adjacency.append(neighboring.tolist())
-		
-		# Randomly remove some edges such that graph remains connected
-		def path_exists(a, b, without_edge, without_vertices):
-			if a == b:
-				return True
-			for adjacent in self.adjacency[a]:
-				if adjacent in without_vertices:
-					continue
-				elif (a, adjacent) == without_edge or (adjacent, a) == without_edge:
-					continue
-				elif adjacent == b:
-					return True
-				else:
-					exists = path_exists(adjacent, b, without_edge, without_vertices + [adjacent])
-					if exists:
-						return True
-			return False
-	
-		def alternate_path_exists(a, b):
-			return path_exists(a, b, (a, b), [])
-		
-		def remove_edge(a, b):
-			assert (b in self.adjacency[a])
-			assert (a in self.adjacency[b])
-			self.adjacency[a].remove(b)
-			self.adjacency[b].remove(a)
-	
-		hull = triangulation.convex_hull
-		for i in range(self.maximal_removed_edges): 
-			a = random.randint(0, len(self.adjacency)-1)
-			b = random.choice(self.adjacency[a])
-			if len(self.adjacency[a]) <= 1 or len(self.adjacency[b]) <= 1:
-				continue
-			if (a in hull) and (b in hull):
-				continue
-			if alternate_path_exists(a, b):
-				remove_edge(a, b)
 				
+		# Place intersection points near center of these cells cells
+		self.intersection_points = []
+		intersection_point_grid = np.empty((side_number_of_cells, side_number_of_cells), dtype=int)
+		i = 0
+		for x in range(side_number_of_cells):
+			for y in range(side_number_of_cells):
+				center_x, center_y = cell_center(x, y)
+				sigma = cell_side_length / self.edges_deviation
+				px = random.normalvariate(center_x, sigma)
+				py = random.normalvariate(center_y, sigma)
+				intersection_point_grid[x, y] = i
+				i = i + 1
+				self.intersection_points.append((px, py))
+		
+		# Build roads according to grid, but randomly leave out some segments
+		self.adjacency = []
+		for i in range(side_number_of_cells * side_number_of_cells):
+			self.adjacency.append([])
+		
+		for x in range(side_number_of_cells):
+			last = None
+			for y in range(side_number_of_cells):
+				c = intersection_point_grid[x, y]
+				if last != None:
+					self.adjacency[c].append(last)
+					self.adjacency[last].append(c)
+				last = c
+		for y in range(side_number_of_cells):
+			last = None
+			for x in range(side_number_of_cells):
+				c = intersection_point_grid[x, y]
+				if last != None:
+					self.adjacency[c].append(last)
+					self.adjacency[last].append(c)
+				last = c
 
 
 	def __create_road(self, a, b):
@@ -229,6 +204,5 @@ class PrimaryRoadNetwork:
 			bpy.context.scene.objects.link(obj)
 			
 	def generate(self):
-		self.__choose_intersection_points()
 		self.__create_high_level_graph()
 		self.__create_low_level_graph()
