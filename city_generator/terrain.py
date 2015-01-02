@@ -4,16 +4,12 @@ import math
 import bpy
 
 
-class Terrain:
-	"""Terrain with randomly generated height map, using diamond-square algorithm."""
-
+class HeightMap:
+	"""Randomly generated height map, using diamond-square algorithm."""
 	initial_height_range = (0.0, 1.0)
 	roughness = 1.0
 	resolution = 8
-
-	def __init__(self):
-		pass
-
+	
 	def __square(self, pos, r, d):
 		x, y = pos
 		positions = [
@@ -60,17 +56,7 @@ class Terrain:
 				self.__diamond((x, y), half, d)
 		
 		self.__subdivide(half, d / 2.0)
-
-	def height_at(self, x, y):
-		x_ind = int(math.floor(x * self.side_length))
-		x_ind = min(x_ind, self.side_length - 1)
-		x_ind = max(x_ind, 0)
-					
-		y_ind = int(math.floor(y * self.side_length))
-		y_ind = min(y_ind, self.side_length - 1)
-		y_ind = max(y_ind, 0)
-	
-		return self.image[y_ind, x_ind]
+		
 	
 	def generate(self):
 		self.side_length = 2**self.resolution + 1
@@ -83,16 +69,24 @@ class Terrain:
 		self.image[-1, -1] = random.uniform(*self.initial_height_range)
 
 		self.__subdivide(self.side_length - 1, self.roughness)
+
+
+
+
+class Terrain(HeightMap):
+	"""Terrain based on height map."""
+	width = 50.0
+	height = 1.0
 	
-	def create_blender_mesh(self, scale, name="terrain"):
+	def create_blender_mesh(self, name="terrain"):
 		sl = self.side_length
 		
 		vertices = []		
 		for y in range(0, sl):
-			vert_y = float(scale[1] * y) / sl
+			vert_y = float(self.width * y) / sl
 			for x in range(0, sl):
-				vert_x = float(scale[0] * x) / sl
-				vert_z = scale[2] * self.image[y, x]
+				vert_x = float(self.width * x) / sl
+				vert_z = self.height * self.image[y, x]
 				vert = (vert_x, vert_y, vert_z)
 				vertices.append(vert)
 		
@@ -111,3 +105,15 @@ class Terrain:
 		mesh.from_pydata(vertices, [], faces)
 		mesh.update(calc_edges=True)
 		return mesh
+
+	
+	def height_at(self, x, y):
+		x_ind = int(math.floor(x * self.side_length / self.width))
+		x_ind = min(x_ind, self.side_length - 1)
+		x_ind = max(x_ind, 0)
+					
+		y_ind = int(math.floor(y * self.side_length / self.width))
+		y_ind = min(y_ind, self.side_length - 1)
+		y_ind = max(y_ind, 0)
+	
+		return self.height * self.image[y_ind, x_ind]

@@ -19,6 +19,7 @@ class Plan:
 
 
 class PrimaryRoadNetwork:
+	"""High and low level primary road network, generated randomly. Roads are shaped based on terrain."""
 	number_of_intersection_points = 10
 	maximal_removed_edges = 10
 	edges_deviation = 20.0
@@ -40,7 +41,7 @@ class PrimaryRoadNetwork:
 		side_number_of_cells = 2**depth
 		number_of_cells = side_number_of_cells**2
 		assert number_of_cells >= n
-		cell_side_length = 1.0 / side_number_of_cells
+		cell_side_length = self.terrain.width / side_number_of_cells
 		def cell_center(i):
 			x = i % side_number_of_cells
 			y = i // side_number_of_cells
