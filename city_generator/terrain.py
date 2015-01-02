@@ -7,8 +7,8 @@ import bpy
 class HeightMap:
 	"""Randomly generated height map, using diamond-square algorithm."""
 	initial_height_range = (0.0, 1.0)
-	roughness = 1.3
-	resolution = 4
+	roughness = 0.6
+	resolution = 7
 	
 	def __square(self, pos, r, d):
 		x, y = pos
@@ -76,7 +76,7 @@ class HeightMap:
 class Terrain(HeightMap):
 	"""Terrain based on height map."""
 	width = 500.0
-	height = 8.0
+	height = 50.0
 	
 	def create_blender_mesh(self, name="terrain"):
 		sl = self.side_length

@@ -21,13 +21,13 @@ class Plan:
 
 class PrimaryRoadNetwork:
 	"""High and low level primary road network, generated randomly. Roads are shaped based on terrain."""
-	min_number_of_intersection_points = 10
-	edges_deviation = 8.0
+	approximate_number_of_intersection_points = 30
+	edges_deviation = 7.0
 
 	road_step_distance = 10.0
 	road_number_of_samples = 15
 	road_snap_distance = 15.0
-	road_deviation_angle = math.radians(10.0)
+	road_deviation_angle = math.radians(8.0)
 
 
 	def __init__(self, terrain):
@@ -37,54 +37,71 @@ class PrimaryRoadNetwork:
 	def __create_high_level_graph(self):
 		# Subdivide terrain into grid where cell side length is power of 2
 		# such that there are at least as many cells as points 
-		n = self.min_number_of_intersection_points
-		depth = int(math.ceil(math.log(n, 4)))
-		side_number_of_cells = 2**depth
-		number_of_cells = side_number_of_cells**2
-		assert number_of_cells >= n
-		cell_side_length = self.terrain.width / side_number_of_cells
+		number_of_cells_x = int(math.ceil(math.sqrt(self.approximate_number_of_intersection_points)))
+		number_of_cells_y = int(math.floor(math.sqrt(self.approximate_number_of_intersection_points)))
+		number_of_cells = number_of_cells_x * number_of_cells_y
+		cell_side_length_x = self.terrain.width / number_of_cells_x
+		cell_side_length_y = self.terrain.width / number_of_cells_y
 		
 		def cell_coordinates(i):
-			x = i % side_number_of_cells
-			y = i // side_number_of_cells
+			x = i % side_number_of_cells_x
+			y = i // side_number_of_cells_y
 			return (x, y)
 			
 		def cell_center(x, y):
-			center_x = cell_side_length/2.0 + x*cell_side_length
-			center_y = cell_side_length/2.0 + y*cell_side_length
+			center_x = cell_side_length_x/2.0 + x*cell_side_length_x
+			center_y = cell_side_length_y/2.0 + y*cell_side_length_y
+			return (center_x, center_y)
+		
+		def cell_biased_center(x, y):
+			enlarge = 0.35
+			center_x, center_y = cell_center(x, y)
+			center_x += center_x * enlarge
+			center_x -= self.terrain.width * enlarge / 2.0
+			center_y += center_y * enlarge
+			center_y -= self.terrain.width * enlarge / 2.0
 			return (center_x, center_y)
 		
 				
 		# Place intersection points near center of these cells cells
 		self.intersection_points = []
-		intersection_point_grid = np.empty((side_number_of_cells, side_number_of_cells), dtype=int)
+		intersection_point_grid = np.empty((number_of_cells_x, number_of_cells_y), dtype=int)
 		i = 0
-		for x in range(side_number_of_cells):
-			for y in range(side_number_of_cells):
+		for x in range(number_of_cells_x):
+			for y in range(number_of_cells_y):
+				bcenter_x, bcenter_y = cell_biased_center(x, y)
 				center_x, center_y = cell_center(x, y)
-				sigma = cell_side_length / self.edges_deviation
-				px = random.normalvariate(center_x, sigma)
-				py = random.normalvariate(center_y, sigma)
+				clamp = lambda minn, maxn, n: max(min(maxn, n), minn)
+				px = clamp(
+					center_x - cell_side_length_x / 2.0,
+					center_x + cell_side_length_x / 2.0,
+					random.normalvariate(bcenter_x, cell_side_length_x / self.edges_deviation)
+				)
+				py = clamp(
+					center_y - cell_side_length_y / 2.0,
+					center_y + cell_side_length_y / 2.0,
+					random.normalvariate(bcenter_y, cell_side_length_y / self.edges_deviation)
+				)
 				intersection_point_grid[x, y] = i
 				i = i + 1
 				self.intersection_points.append((px, py))
 		
 		# Build roads according to grid, but randomly leave out some segments
 		self.adjacency = []
-		for i in range(side_number_of_cells * side_number_of_cells):
+		for i in range(number_of_cells):
 			self.adjacency.append([])
 		
-		for x in range(side_number_of_cells):
+		for x in range(number_of_cells_x):
 			last = None
-			for y in range(side_number_of_cells):
+			for y in range(number_of_cells_y):
 				c = intersection_point_grid[x, y]
 				if last != None:
 					self.adjacency[c].append(last)
 					self.adjacency[last].append(c)
 				last = c
-		for y in range(side_number_of_cells):
+		for y in range(number_of_cells_y):
 			last = None
-			for x in range(side_number_of_cells):
+			for x in range(number_of_cells_x):
 				c = intersection_point_grid[x, y]
 				if last != None:
 					self.adjacency[c].append(last)
