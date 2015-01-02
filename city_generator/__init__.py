@@ -6,15 +6,18 @@ bl_info = {
 	'category' : "Object"	
 }
 
-__all__ = ['city', 'plan', 'terrain']
+__all__ = ['city', 'plan', 'terrain', 'assets']
+
+import imp
 
 if 'bpy' in locals():
 	import imp
 	imp.reload(city)
 	imp.reload(plan)
 	imp.reload(terrain)
+	imp.reload(assets)
 else:
-	from . import city, plan, terrain
+	from . import city, plan, terrain, assets
 
 import bpy
 

@@ -4,6 +4,7 @@ import math
 import scipy.spatial
 import bpy
 
+from . import assets
 
 class Plan:
 	"""Plan of the city, consisting of road map and outlines for buildings."""
@@ -24,9 +25,9 @@ class PrimaryRoadNetwork:
 	maximal_removed_edges = 10
 	edges_deviation = 20.0
 
-	road_step_distance = 0.05
+	road_step_distance = 5.0
 	road_number_of_samples = 15
-	road_snap_distance = 0.1
+	road_snap_distance = 1.0
 	road_deviation_angle = math.radians(10.0)
 
 
@@ -151,7 +152,7 @@ class PrimaryRoadNetwork:
 			return best
 		
 		road_points = [src]
-		max_iterations = 100
+		max_iterations = 1000
 		iterations = 0
 			
 		while dist(pos, dst) > snap_distance:			
@@ -188,7 +189,7 @@ class PrimaryRoadNetwork:
 					self.roads[key] = road
 	
 
-	def __create_blender_polyline_for_road(self, name, road):
+	def __create_blender_curve_for_road(self, name, road):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
 		
@@ -199,15 +200,32 @@ class PrimaryRoadNetwork:
 			z = self.terrain.height_at(x, y)
 			polyline.points[i].co = (x, y, z, 1.0)
 			i = i + 1
-				
-		return curve
+		
+		curve_obj = bpy.data.objects.new(name + "_curve", curve)
+		return curve_obj
+	
+	def __create_blender_road(self, name, road):
+		curve = self.__create_blender_curve_for_road(name, road)
+		bpy.context.scene.objects.link(curve)
+		
+		road = assets.load_object('primary_road')
+		road.name = name
+		road.location = (0.0, 0.0, 3.0)
+		array_modifier = road.modifiers.new("Array", type='ARRAY')
+		array_modifier.fit_type = 'FIT_CURVE'
+		array_modifier.curve = curve
+
+		curve_modifier = road.modifiers.new("Curve", type='CURVE')
+		curve_modifier.object = curve
+		return road
+		
 		
 	def create_blender_roads(self):
+		i = 0
 		for key in self.roads:
+			i = i + 1
 			road = self.roads[key]
-			curve = self.__create_blender_polyline_for_road("road_curve", road)
-			
-			obj = bpy.data.objects.new("road_curve_obj", curve)
+			obj = self.__create_blender_road("road "+str(i), road)
 			bpy.context.scene.objects.link(obj)
 			
 	def generate(self):

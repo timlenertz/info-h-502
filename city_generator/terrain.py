@@ -75,8 +75,8 @@ class HeightMap:
 
 class Terrain(HeightMap):
 	"""Terrain based on height map."""
-	width = 50.0
-	height = 1.0
+	width = 500.0
+	height = 10.0
 	
 	def create_blender_mesh(self, name="terrain"):
 		sl = self.side_length
