@@ -3,7 +3,7 @@ import bpy
 
 def load_assets_library():
 	lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets.blend')
-	return bpy.data.libraries.load(lib, link=False)
+	return bpy.data.libraries.load(lib, link=True)
 
 
 def load_object(name):

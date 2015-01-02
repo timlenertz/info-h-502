@@ -196,29 +196,45 @@ class PrimaryRoadNetwork:
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
 		return curve_obj
 	
-	def __create_blender_road(self, name, road):
+	def __create_blender_road(self, parent, name, road):
 		curve = self.__create_blender_curve_for_road(name, road)
-		bpy.context.scene.objects.link(curve)
 		
 		road = assets.load_object('primary_road')
 		road.name = name
-		road.location = (0.0, 0.0, 3.0)
+		road.location = (0.0, 0.0, 0.0)
+		
+		curve.parent = road
+		
 		array_modifier = road.modifiers.new("Array", type='ARRAY')
 		array_modifier.fit_type = 'FIT_CURVE'
 		array_modifier.curve = curve
 
 		curve_modifier = road.modifiers.new("Curve", type='CURVE')
 		curve_modifier.object = curve
+		
+		if 'terrain' in bpy.context.scene.objects:
+			shrinkwrap_modifier = road.modifiers.new("Shrinkwrap", type='SHRINKWRAP')
+			shrinkwrap_modifier.target = bpy.context.scene.objects['terrain']
+
+		bpy.context.scene.objects.link(curve)
+		bpy.context.scene.objects.link(road)
+		
 		return road
 		
 		
-	def create_blender_roads(self):
+	def create_blender_roads(self, root):
+		parent = bpy.data.objects.new('primary_roads', None)
+		parent.parent = root
+		bpy.context.scene.objects.link(parent)
+	
 		i = 0
 		for key in self.roads:
 			i = i + 1
 			road = self.roads[key]
-			obj = self.__create_blender_road("road "+str(i), road)
-			bpy.context.scene.objects.link(obj)
+			obj = self.__create_blender_road(parent, 'primary_road_' + str(i), road)
+			obj.parent = parent
+			
+		return parent
 			
 	def generate(self):
 		self.__create_high_level_graph()
