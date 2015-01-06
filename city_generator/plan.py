@@ -11,19 +11,103 @@ class Plan:
 	"""Plan of the city, consisting of road map and outlines for buildings."""
 	def __init__(self, ter):
 		self.terrain = ter
-		self.primary_road_network = PrimaryRoadNetwork(ter)
+		self.road_network = RoadNetwork(ter)
 	
 	def generate(self):
 		self.terrain.generate()
-		self.primary_road_network.generate()
-
-
-class SecondaryRoadNetwork:
-	pass
+		self.road_network.generate()
 
 
 
-class PrimaryRoadNetwork:
+class CityCell:
+	"""City cell encloded by primary road cycle. Contains secondary roads, and building blocks."""
+	def __init__(self, terrain, cycle):
+		self.__choose_control_parameters()
+
+		self.cycle = nx.Graph()
+		self.terrain = terrain
+		first = cycle[0]
+		last = first
+		for node in cycle[1:]:
+			self.cycle.add_edge(last, node)
+			last = node
+		self.cycle.add_edge(last, first)
+		
+	
+	def __select_starting_points(self, n):	
+		# N longest cycle edges
+		len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
+		edges = self.cycle.edges()
+		edges = sorted(edges, key=lambda e: -len(*e))
+		edges = edges[:n]
+		print(self.cycle.edges())
+
+		# Randomly deviated midpoints
+		points = []
+		for a, b in edges:			
+			r = random.normalvariate(0.5, 0.2)
+			r = min(max(r, 0.0), 1.0)
+			px = a[0] + r * b[0]
+			py = a[1] + r * b[1]
+			p = (px, py)
+			edge = (a, b)
+			points.append((p, edge))
+		
+		return points
+	
+	
+	def __choose_control_parameters(self):
+		self.segment_size = 10.0
+		self.snap_size = 2.0
+		self.degree = 3
+
+		
+	def __grow_from(self, pt):
+		pass
+	
+
+	def generate(self):
+		self.graph = nx.Graph()
+	
+		starting_points = self.__select_starting_points(2)
+		extremities = []
+		for s, edge in starting_points:
+			a, b = edge
+			ab = (b[0] - a[0], b[1] - a[1])
+			ap = (-ab[1], ab[0])
+			len_ap = math.sqrt(ap[0]**2 + ap[1]**2)
+			ap = (self.segment_size * ap[0] / len_ap, self.segment_size * ap[1] / len_ap)
+			p = (ap[0] - a[0], ap[1] - a[1])
+			self.graph.add_edge(s, p)
+			extremities.append(p)
+		
+		grow = True
+		while grow:
+			grow = False
+			for pt in extremities:
+				grew = self.__grow_from(pt)
+				grow = grow or grew
+	
+
+	
+	def __create_blender_curve(self, name, parent):
+		curve = bpy.data.curves.new(name=name, type='CURVE')
+		curve.dimensions = '3D'
+		
+		for a, b in self.graph.edges_iter():
+			polyline = curve.splines.new('POLY')
+			polyline.points.add(1)
+			polyline.points[0].co = (a[0], a[1], 0)
+			polyline.points[1].co = (b[0], b[1], 0)
+		
+		curve_obj = bpy.data.objects.new(name + "_curve", curve)
+		curve_obj.parent = parent
+		bpy.context.scene.objects.link(curve_obj)
+		return curve_obj
+
+
+
+class RoadNetwork:
 	"""High and low level primary road network, generated randomly. Roads are shaped based on terrain."""
 	approximate_number_of_intersection_points = 30
 	edges_deviation = 7.0
@@ -86,36 +170,35 @@ class PrimaryRoadNetwork:
 					center_y + cell_side_length_y / 2.0,
 					random.normalvariate(bcenter_y, cell_side_length_y / self.edges_deviation)
 				)
+				p = (px, py)
 				intersection_point_grid[x, y] = i
+				self.intersection_points.append(p)
 				i = i + 1
-				self.intersection_points.append((px, py))
 		
 		# Build roads graph according to grid
 		self.graph = nx.Graph()
 		for x in range(number_of_cells_x):
 			last = None
 			for y in range(number_of_cells_y):
-				c = intersection_point_grid[x, y]
+				c = self.intersection_points[intersection_point_grid[x, y]]
 				if last != None:
 					self.graph.add_edge(last, c)
 				last = c
 		for y in range(number_of_cells_y):
 			last = None
 			for x in range(number_of_cells_x):
-				c = intersection_point_grid[x, y]
+				c = self.intersection_points[intersection_point_grid[x, y]]
 				if last != None:
 					self.graph.add_edge(last, c)
 				last = c
 
 
-	def __create_road(self, a, b):
+	def __create_road(self, src, dst):
 		def dist(p1, p2):
 			dx = p1[0] - p2[0]
 			dy = p1[1] - p2[1]
 			return math.sqrt(dx*dx + dy*dy)
 		
-		src = self.intersection_points[a]
-		dst = self.intersection_points[b]
 		step_distance = self.road_step_distance
 		number_of_samples = self.road_number_of_samples
 		snap_distance = self.road_snap_distance
@@ -182,7 +265,12 @@ class PrimaryRoadNetwork:
 	
 	
 	def __create_city_cells(self):
-		self.city_cells = nx.cycle_basis(self.graph)
+		cycles = nx.cycle_basis(self.graph)
+		self.city_cells = []
+		for cycle in cycles:
+			city_cell = CityCell(self.terrain, cycle)
+			city_cell.generate()
+			self.city_cells.append(city_cell)
 
 	def __create_blender_curve_for_road(self, name, road):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
@@ -238,7 +326,15 @@ class PrimaryRoadNetwork:
 			i = i + 1
 			road = self.roads[key]
 			self.__create_blender_road(parent, 'primary_road_' + str(i), road)
-			
+		
+		i = 0
+		for cell in self.city_cells:
+			i = i + 1
+			cell_parent = bpy.data.objects.new('city_cell_' + str(i), None)
+			bpy.context.scene.objects.link(cell_parent)
+			cell_parent.parent = root
+			cell.create_blender_curve('roads', cell_parent)
+		
 		return parent
 			
 	def generate(self):
