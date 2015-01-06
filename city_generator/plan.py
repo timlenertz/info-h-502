@@ -24,27 +24,39 @@ class CityCell:
 	def __init__(self, road_network, cycle):
 		self.__choose_control_parameters()
 
-		self.cycle = nx.Graph()
+		u = self.__edge_to_vector((cycle[0], cycle[1]))
+		v = self.__edge_to_vector((cycle[1], cycle[2]))
+		cross_z = u[0]*v[1] - u[1]*v[0];
+		if cross_z > 0:
+			cycle.reverse()
+
+		self.cycle = []
 		self.road_network = road_network
 		first = cycle[0]
 		last = first
 		for node in cycle[1:]:
-			self.cycle.add_edge(last, node)
+			self.cycle.append((last, node))
 			last = node
-		self.cycle.add_edge(last, first)
+		self.cycle.append((last, first))
+
 		
+	@staticmethod
+	def __edge_to_vector(edge):
+		a, b = edge
+		arr = np.empty((2))
+		arr[0] = b[0] - a[0]
+		arr[1] = b[1] - a[1]
+		return arr.transpose()
 	
 	def __select_starting_points(self, n):	
 		# N longest cycle edges
 		edge_len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
-		edges = self.cycle.edges()
-		edges = sorted(edges, key=lambda e: -edge_len(*e))
-		edges = edges[:n]
+		longest_edges = sorted(self.cycle, key=lambda e: -edge_len(*e))
 
 		points = []
-		for a, b in edges:	
+		for a, b in longest_edges[:n]:
 			# Get low level road path for that edge	
-			road = self.road_network.road_for_edge(a, b)		
+			road = self.road_network.oriented_road_for_edge(a, b)		
 			
 			# Deviated middle segment
 			r = random.normalvariate(0.5, 0.2)
@@ -52,7 +64,7 @@ class CityCell:
 			n = len(road) - 1
 			i = math.floor(n * r)
 			a, b = road[i], road[i+1]
-			
+				
 			# Random position on that segment
 			r = random.uniform(0.0, 1.0)
 			px = a[0] + r * (b[0] - a[0])
@@ -65,13 +77,15 @@ class CityCell:
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 30.0
+		self.segment_size = 40.0
 		self.snap_size = 2.0
 		self.degree = 3
 
 		
 	def __grow_from(self, pt):
 		pass
+	
+	
 	
 
 	def generate(self):
@@ -168,14 +182,15 @@ class RoadNetwork:
 				bcenter_x, bcenter_y = cell_biased_center(x, y)
 				center_x, center_y = cell_center(x, y)
 				clamp = lambda minn, maxn, n: max(min(maxn, n), minn)
+				padding = 30.0
 				px = clamp(
-					center_x - cell_side_length_x / 2.0,
-					center_x + cell_side_length_x / 2.0,
+					center_x - cell_side_length_x / 2.0 + padding,
+					center_x + cell_side_length_x / 2.0 - padding,
 					random.normalvariate(bcenter_x, cell_side_length_x / self.edges_deviation)
 				)
 				py = clamp(
-					center_y - cell_side_length_y / 2.0,
-					center_y + cell_side_length_y / 2.0,
+					center_y - cell_side_length_y / 2.0 + padding,
+					center_y + cell_side_length_y / 2.0 - padding,
 					random.normalvariate(bcenter_y, cell_side_length_y / self.edges_deviation)
 				)
 				p = (px, py)
@@ -264,9 +279,13 @@ class RoadNetwork:
 	def __road_key(a, b):
 		return frozenset([a, b])
 		
-	def road_for_edge(self, a, b):
+	def oriented_road_for_edge(self, a, b):
 		key = self.__road_key(a, b)
-		return self.roads[key]
+		road = self.roads[key]
+		if road[-1] == b:
+			road = road[:]
+			road.reverse()
+		return road
 	
 	def __create_low_level_graph(self):
 		self.roads = dict()

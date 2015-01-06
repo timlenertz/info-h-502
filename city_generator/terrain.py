@@ -112,7 +112,7 @@ class Terrain(HeightMap):
 		terrain_mesh = self.create_blender_mesh('terrain')
 		terrain_obj = bpy.data.objects.new('terrain', terrain_mesh)
 		terrain_obj.parent = parent
-		bpy.context.scene.objects.link(terrain_obj)
+		#bpy.context.scene.objects.link(terrain_obj)
 		
 		mat = bpy.data.materials.new('terrain')
 		mat.diffuse_color = (1.0, 1.0, 1.0)
