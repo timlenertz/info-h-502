@@ -21,11 +21,11 @@ class Plan:
 
 class CityCell:
 	"""City cell encloded by primary road cycle. Contains secondary roads, and building blocks."""
-	def __init__(self, terrain, cycle):
+	def __init__(self, road_network, cycle):
 		self.__choose_control_parameters()
 
 		self.cycle = nx.Graph()
-		self.terrain = terrain
+		self.road_network = road_network
 		first = cycle[0]
 		last = first
 		for node in cycle[1:]:
@@ -36,19 +36,27 @@ class CityCell:
 	
 	def __select_starting_points(self, n):	
 		# N longest cycle edges
-		len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
+		edge_len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
 		edges = self.cycle.edges()
-		edges = sorted(edges, key=lambda e: -len(*e))
+		edges = sorted(edges, key=lambda e: -edge_len(*e))
 		edges = edges[:n]
-		print(self.cycle.edges())
 
-		# Randomly deviated midpoints
 		points = []
-		for a, b in edges:			
+		for a, b in edges:	
+			# Get low level road path for that edge	
+			road = self.road_network.road_for_edge(a, b)		
+			
+			# Deviated middle segment
 			r = random.normalvariate(0.5, 0.2)
-			r = min(max(r, 0.0), 1.0)
-			px = a[0] + r * b[0]
-			py = a[1] + r * b[1]
+			r = min(max(r, 0.0), 0.95)
+			n = len(road) - 1
+			i = math.floor(n * r)
+			a, b = road[i], road[i+1]
+			
+			# Random position on that segment
+			r = random.uniform(0.0, 1.0)
+			px = a[0] + r * (b[0] - a[0])
+			py = a[1] + r * (b[1] - a[1])
 			p = (px, py)
 			edge = (a, b)
 			points.append((p, edge))
@@ -57,7 +65,7 @@ class CityCell:
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 10.0
+		self.segment_size = 30.0
 		self.snap_size = 2.0
 		self.degree = 3
 
@@ -77,7 +85,7 @@ class CityCell:
 			ap = (-ab[1], ab[0])
 			len_ap = math.sqrt(ap[0]**2 + ap[1]**2)
 			ap = (self.segment_size * ap[0] / len_ap, self.segment_size * ap[1] / len_ap)
-			p = (ap[0] - a[0], ap[1] - a[1])
+			p = (s[0] + ap[0], s[1] + ap[1])
 			self.graph.add_edge(s, p)
 			extremities.append(p)
 		
@@ -90,15 +98,15 @@ class CityCell:
 	
 
 	
-	def __create_blender_curve(self, name, parent):
+	def create_blender_curve(self, name, parent):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
 		
 		for a, b in self.graph.edges_iter():
 			polyline = curve.splines.new('POLY')
 			polyline.points.add(1)
-			polyline.points[0].co = (a[0], a[1], 0)
-			polyline.points[1].co = (b[0], b[1], 0)
+			polyline.points[0].co = (a[0], a[1], 0.0, 1.0)
+			polyline.points[1].co = (b[0], b[1], 0.0, 1.0)
 		
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
 		curve_obj.parent = parent
@@ -255,6 +263,10 @@ class RoadNetwork:
 	@staticmethod
 	def __road_key(a, b):
 		return frozenset([a, b])
+		
+	def road_for_edge(self, a, b):
+		key = self.__road_key(a, b)
+		return self.roads[key]
 	
 	def __create_low_level_graph(self):
 		self.roads = dict()
@@ -268,11 +280,11 @@ class RoadNetwork:
 		cycles = nx.cycle_basis(self.graph)
 		self.city_cells = []
 		for cycle in cycles:
-			city_cell = CityCell(self.terrain, cycle)
+			city_cell = CityCell(self, cycle)
 			city_cell.generate()
 			self.city_cells.append(city_cell)
 
-	def __create_blender_curve_for_road(self, name, road):
+	def __create_blender_curve_for_road(self, parent, name, road):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
 		
@@ -285,14 +297,16 @@ class RoadNetwork:
 			i = i + 1
 		
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
+		curve_obj.parent = parent
 		return curve_obj
 	
 	def __create_blender_road(self, parent, name, road):
-		curve = self.__create_blender_curve_for_road(name, road)
+		curve = self.__create_blender_curve_for_road(parent, name, road)
 		
 		road = assets.load_object('primary_road')
 		road.name = name
 		road.location = (0.0, 0.0, 0.0)
+		road.parent = parent
 				
 		array_modifier = road.modifiers.new("Array", type='ARRAY')
 		array_modifier.fit_type = 'FIT_CURVE'
@@ -301,17 +315,15 @@ class RoadNetwork:
 		curve_modifier = road.modifiers.new("Curve", type='CURVE')
 		curve_modifier.object = curve
 		
-		if 'terrain' in bpy.context.scene.objects:
-			shrinkwrap_modifier = road.modifiers.new("Shrinkwrap", type='SHRINKWRAP')
-			shrinkwrap_modifier.target = bpy.context.scene.objects['terrain']
-			shrinkwrap_modifier.use_keep_above_surface = True
-			shrinkwrap_modifier.offset = 0.2
+		#if 'terrain' in bpy.context.scene.objects:
+		#	shrinkwrap_modifier = road.modifiers.new("Shrinkwrap", type='SHRINKWRAP')
+		#	shrinkwrap_modifier.target = bpy.context.scene.objects['terrain']
+		#	shrinkwrap_modifier.use_keep_above_surface = True
+		#	shrinkwrap_modifier.offset = 0.2
 
 		bpy.context.scene.objects.link(curve)
 		bpy.context.scene.objects.link(road)
 		
-		curve.parent = parent
-		road.parent = parent
 		
 		return road
 		

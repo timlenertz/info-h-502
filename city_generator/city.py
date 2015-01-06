@@ -16,7 +16,7 @@ class City:
 		self.terrain.generate()
 		self.plan.generate()
 		
-	def create_blender_object(self, name="City"):
+	def create_blender_object(self, name):
 		scene = bpy.context.scene
 			
 		# Root

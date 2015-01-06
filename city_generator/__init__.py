@@ -22,6 +22,11 @@ else:
 	import bpy
 
 
+bpy.types.Scene.city_name = bpy.props.StringProperty(
+	name="Name",
+	description="Name of root object for city",
+	default="City",
+)
 
 bpy.types.Scene.terrain_roughness = bpy.props.FloatProperty(
 	name="Roughness",
@@ -143,6 +148,8 @@ class CityGeneratorPanel(bpy.types.Panel):
 		layout = self.layout
 		scene = context.scene
 		
+		layout.prop(scene, 'city_name')
+		
 		box = layout.box()
 		box.label("Terrain")
 		box.prop(scene, 'terrain_roughness')
@@ -160,16 +167,18 @@ class CityGeneratorPanel(bpy.types.Panel):
 		box.prop(scene, 'snap_distance')
 		box.prop(scene, 'deviation_angle')
 			
-		row = layout.row()
-		row.operator('city.generate')
+		layout.operator('city.generate')
+		layout.operator('city.delete')
 
 
 class OBJECT_OT_GenerateCity(bpy.types.Operator):
 	bl_idname = 'city.generate'
-	bl_label = "Generate City"
+	bl_label = "Generate new city"
 	bl_description = "Generate city with given parameters."
 		
 	def execute(self, context):
+		bpy.ops.city.delete()
+	
 		scene = context.scene
 		cit = city.City()
 		cit.terrain.roughness = scene.terrain_roughness
@@ -187,9 +196,27 @@ class OBJECT_OT_GenerateCity(bpy.types.Operator):
 		cit.plan.road_network.road_deviation_angle = scene.deviation_angle
 		
 		cit.generate()
-		city_root = cit.create_blender_object()
+		city_root = cit.create_blender_object(scene.city_name)
 		bpy.context.scene.objects.link(city_root)
 		return { 'FINISHED' }
+
+
+class OBJECT_OT_DeleteCity(bpy.types.Operator):
+	bl_idname = 'city.delete'
+	bl_label = "Delete city"
+	bl_description = "Delete city with the given name."
+	
+	def execute(self, context):
+		if context.scene.city_name in bpy.data.objects:
+			city = bpy.data.objects[context.scene.city_name]
+			bpy.ops.object.select_all(action='DESELECT')
+			bpy.context.scene.objects.active = city
+			city.select = True
+			bpy.ops.object.select_grouped(type='CHILDREN_RECURSIVE', extend=True)
+			bpy.ops.object.delete(use_global=False)
+		
+		return { 'FINISHED' }
+
 
 
 def register():
