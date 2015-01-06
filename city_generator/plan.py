@@ -24,8 +24,10 @@ class CityCell:
 	def __init__(self, road_network, cycle):
 		self.__choose_control_parameters()
 
-		u = self.__edge_to_vector((cycle[0], cycle[1]))
-		v = self.__edge_to_vector((cycle[1], cycle[2]))
+		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
+
+		u = vec(cycle[0], cycle[1])
+		v = vec(cycle[1], cycle[2])
 		cross_z = u[0]*v[1] - u[1]*v[0];
 		if cross_z > 0:
 			cycle.reverse()
@@ -41,13 +43,39 @@ class CityCell:
 
 		
 	@staticmethod
-	def __edge_to_vector(edge):
-		a, b = edge
-		arr = np.empty((2))
-		arr[0] = b[0] - a[0]
-		arr[1] = b[1] - a[1]
-		return arr.transpose()
+	def __line_to_point_dist_sq(line, p):
+		a, b = line
+		num = ( (b[1] - a[1])*p[0] - (b[0] - a[0])*p[1] + b[0]*a[1] - b[1]*a[0] )**2
+		den = (b[1] - a[1])**2 + (b[0] - a[0])**2
+		return num / den
 	
+	@staticmethod
+	def __distance_sq(a, b):
+		return (a[0] - b[0])**2 + (a[1] - b[1])**2
+
+	@staticmethod
+	def __distance(a, b):
+		return math.sqrt(CityCell.__distance_sq(a, b))
+
+	@staticmethod
+	def __segment_intersection(seg1, seg2):
+		seg1_len = CityCell.__distance(*seg1)
+		seg2_len = CityCell.__distance(*seg2)
+	
+		def project(seg, seg_len, p):
+			a, b = seg
+			ap = (p[0] - a[0], p[1] - a[1])
+			ab = (b[0] - a[0], b[1] - a[1])
+			ab = (ab[0] / seg_len, ab[1] / seg_len)
+			return ab[0]*ap[0] + ab[1]*ap[1]
+	
+		def test(seg, seg_len, p):
+			d = project(seg, seg_len, p)
+			return (d > 0) and (d < seg_len)
+		
+		return test(seg1, seg1_len, seg2[0]) and test(seg1, seg1_len, seg2[1]) and test(seg2, seg2_len, seg1[0]) and test(seg2, seg2_len, seg1[1])
+	
+
 	def __select_starting_points(self, n):	
 		# N longest cycle edges
 		edge_len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
@@ -77,16 +105,116 @@ class CityCell:
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 40.0
-		self.snap_size = 2.0
+		self.segment_size = 20.0
+		self.snap_size = 10.0
 		self.degree = 3
-
+		
 		
 	def __grow_from(self, pt):
-		pass
+		new_extremities = []
+	
+		prev = None
+		for p in nx.all_neighbors(self.graph, pt):
+			prev = p
+			break
+		
+		region_per_branch = np.pi / self.degree
+		for i in range(self.degree):
+			mn = region_per_branch * i
+			mx = mn + region_per_branch
+			
+			r = random.normalvariate(0.5, 0.1)
+			r = min(max(r, 0.0), 1.0)
+			
+			rel_angle = mn + r * (mx - mn)
+			edge_angle = np.arctan2(pt[1] - prev[1], pt[0] - prev[0])
+			angle = edge_angle - np.pi/2 + rel_angle
+			dx = self.segment_size * np.cos(angle)
+			dy = self.segment_size * np.sin(angle)
+			new_pt = (pt[0] + dx, pt[1] + dy)
+			new_edge = (pt, new_pt)
+			snap = self.__snap(new_edge)
+			if not snap:
+				self.graph.add_edge(*new_edge)
+				new_extremities.append(new_pt)
+		
+		return new_extremities
+	
+	def __snap(self, new_edge):
+		if not self.__inside_cycle_test(new_edge):
+			return True
+		elif not self.__node_distance_test(new_edge):
+			return True
+		elif not self.__edge_distance_test(new_edge):
+			return True
+		elif not self.__edge_intersection_test(new_edge):
+			return True
+		else:
+			return False
+		
+		
+	def __node_distance_test(self, new_edge):
+		a, b = new_edge
+		snap_size_sq = self.snap_size**2
+			
+		new_edge_len_sq = (a[0] - b[0])**2 + (a[1] - b[1])**2
+			
+		for c in self.graph.nodes_iter():
+			if c is a:
+				continue
+		
+			r = (c[0] - a[0])*(b[0] - a[0]) + (c[1] - a[1])*(b[1] - a[1])
+			r /= new_edge_len_sq
+						
+			dist_sq = np.inf
+			if r < 0.0:
+				continue
+			elif r < 1.0:
+				dist_sq = self.__line_to_point_dist_sq(new_edge, c)
+			else:
+				dist_sq = (b[0] - c[0])**2 + (b[1] - c[1])**2
+				
+			if dist_sq < snap_size_sq:
+				return False
+	
+		return True
 	
 	
+	def __edge_distance_test(self, new_edge):
+		a, b = new_edge
+		snap_size_sq = self.snap_size**2
+
+		for edge in self.graph.edges_iter():
+			if (edge[0] is a) or (edge[1] is a):
+				print("strange")
+				print("dist", self.__line_to_point_dist_sq(edge, b)	)
+			dist_sq = self.__line_to_point_dist_sq(edge, b)	
+			if dist_sq < snap_size_sq:
+				return False
+
+		return True
 	
+	def __edge_intersection_test(self, new_edge):
+		for edge in self.graph.edges_iter():
+			if self.__segment_intersection(edge, new_edge):
+				return False
+		return True
+
+		
+	def __inside_cycle_test(self, new_edge):
+		a, b = new_edge
+		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
+
+		for cycle_edge in self.cycle:
+			u = vec(cycle_edge[0], cycle_edge[1])
+			v = vec(cycle_edge[0], b)
+			cross_z = u[0]*v[1] - u[1]*v[0];
+			if cross_z > 0:
+				return False
+		return True
+			
+
+
 
 	def generate(self):
 		self.graph = nx.Graph()
@@ -104,18 +232,22 @@ class CityCell:
 			extremities.append(p)
 		
 		grow = True
+		i = 0
 		while grow:
 			grow = False
+			new_extremities = []
 			for pt in extremities:
-				grew = self.__grow_from(pt)
-				grow = grow or grew
-	
+				add_extremities = self.__grow_from(pt)
+				if len(add_extremities) > 0:
+					grow = True
+					new_extremities = new_extremities + add_extremities
+			extremities = new_extremities	
 
 	
 	def create_blender_curve(self, name, parent):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
-		
+
 		for a, b in self.graph.edges_iter():
 			polyline = curve.splines.new('POLY')
 			polyline.points.add(1)
@@ -175,7 +307,7 @@ class RoadNetwork:
 				
 		# Place intersection points near center of these cells cells
 		self.intersection_points = []
-		intersection_point_grid = np.empty((number_of_cells_x, number_of_cells_y), dtype=int)
+		self.intersection_point_grid = np.empty((number_of_cells_x, number_of_cells_y), dtype=int)
 		i = 0
 		for x in range(number_of_cells_x):
 			for y in range(number_of_cells_y):
@@ -194,7 +326,7 @@ class RoadNetwork:
 					random.normalvariate(bcenter_y, cell_side_length_y / self.edges_deviation)
 				)
 				p = (px, py)
-				intersection_point_grid[x, y] = i
+				self.intersection_point_grid[x, y] = i
 				self.intersection_points.append(p)
 				i = i + 1
 		
@@ -203,14 +335,14 @@ class RoadNetwork:
 		for x in range(number_of_cells_x):
 			last = None
 			for y in range(number_of_cells_y):
-				c = self.intersection_points[intersection_point_grid[x, y]]
+				c = self.intersection_points[self.intersection_point_grid[x, y]]
 				if last != None:
 					self.graph.add_edge(last, c)
 				last = c
 		for y in range(number_of_cells_y):
 			last = None
 			for x in range(number_of_cells_x):
-				c = self.intersection_points[intersection_point_grid[x, y]]
+				c = self.intersection_points[self.intersection_point_grid[x, y]]
 				if last != None:
 					self.graph.add_edge(last, c)
 				last = c
@@ -296,8 +428,18 @@ class RoadNetwork:
 	
 	
 	def __create_city_cells(self):
-		cycles = nx.cycle_basis(self.graph)
+		cycles = []
+		cells_x, cells_y = self.intersection_point_grid.shape
+		for y in range(0, cells_y - 1):
+			for x in range(0, cells_x - 1):
+				a = self.intersection_points[self.intersection_point_grid[x, y]]
+				b = self.intersection_points[self.intersection_point_grid[x + 1, y]]
+				c = self.intersection_points[self.intersection_point_grid[x + 1, y + 1]]
+				d = self.intersection_points[self.intersection_point_grid[x, y + 1]]
+				cycles.append([a, b, c, d])
+	
 		self.city_cells = []
+		
 		for cycle in cycles:
 			city_cell = CityCell(self, cycle)
 			city_cell.generate()

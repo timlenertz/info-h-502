@@ -166,6 +166,9 @@ class CityGeneratorPanel(bpy.types.Panel):
 		box.prop(scene, 'step_distance')
 		box.prop(scene, 'snap_distance')
 		box.prop(scene, 'deviation_angle')
+		
+		box = layout.box()
+		box.label("Secondary Streets")
 			
 		layout.operator('city.generate')
 		layout.operator('city.delete')
@@ -207,8 +210,8 @@ class OBJECT_OT_DeleteCity(bpy.types.Operator):
 	bl_description = "Delete city with the given name."
 	
 	def execute(self, context):
-		if context.scene.city_name in bpy.data.objects:
-			city = bpy.data.objects[context.scene.city_name]
+		city = bpy.data.objects.get(context.scene.city_name)
+		if city is not None:
 			bpy.ops.object.select_all(action='DESELECT')
 			bpy.context.scene.objects.active = city
 			city.select = True
