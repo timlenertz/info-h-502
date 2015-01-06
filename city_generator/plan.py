@@ -56,22 +56,24 @@ class CityCell:
 	@staticmethod
 	def __distance(a, b):
 		return math.sqrt(CityCell.__distance_sq(a, b))
+		
+	@staticmethod
+	def __projection_is_on_segment(seg, p, seg_length=None):
+		if seg_length is None:
+			seg_length = CityCell.__distance(*seg)
+		a, b = seg
+		ap = (p[0] - a[0], p[1] - a[1])
+		ab = (b[0] - a[0], b[1] - a[1])
+		ab = (ab[0] / seg_length, ab[1] / seg_length)
+		dot = ab[0]*ap[0] + ab[1]*ap[1]
+		return (dot > 0) and (dot < seg_length)
 
 	@staticmethod
 	def __segment_intersection(seg1, seg2):
 		seg1_len = CityCell.__distance(*seg1)
 		seg2_len = CityCell.__distance(*seg2)
 	
-		def project(seg, seg_len, p):
-			a, b = seg
-			ap = (p[0] - a[0], p[1] - a[1])
-			ab = (b[0] - a[0], b[1] - a[1])
-			ab = (ab[0] / seg_len, ab[1] / seg_len)
-			return ab[0]*ap[0] + ab[1]*ap[1]
-	
-		def test(seg, seg_len, p):
-			d = project(seg, seg_len, p)
-			return (d > 0) and (d < seg_len)
+		test = lambda seg, seg_len, p: CityCell.__projection_is_on_segment(seg, p, seg_length=seg_len)
 		
 		return test(seg1, seg1_len, seg2[0]) and test(seg1, seg1_len, seg2[1]) and test(seg2, seg2_len, seg1[0]) and test(seg2, seg2_len, seg1[1])
 	
@@ -105,8 +107,8 @@ class CityCell:
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 20.0
-		self.snap_size = 10.0
+		self.segment_size = 40.0
+		self.snap_size = 25.0
 		self.degree = 3
 		
 		
@@ -123,7 +125,7 @@ class CityCell:
 			mn = region_per_branch * i
 			mx = mn + region_per_branch
 			
-			r = random.normalvariate(0.5, 0.1)
+			r = random.normalvariate(0.5, 0.4)
 			r = min(max(r, 0.0), 1.0)
 			
 			rel_angle = mn + r * (mx - mn)
@@ -144,10 +146,13 @@ class CityCell:
 		if not self.__inside_cycle_test(new_edge):
 			return True
 		elif not self.__node_distance_test(new_edge):
+			print("1 failed")
 			return True
 		elif not self.__edge_distance_test(new_edge):
+			print("3 failed")
 			return True
 		elif not self.__edge_intersection_test(new_edge):
+			print("2 failed")
 			return True
 		else:
 			return False
@@ -185,9 +190,8 @@ class CityCell:
 		snap_size_sq = self.snap_size**2
 
 		for edge in self.graph.edges_iter():
-			if (edge[0] is a) or (edge[1] is a):
-				print("strange")
-				print("dist", self.__line_to_point_dist_sq(edge, b)	)
+			if not CityCell.__projection_is_on_segment(edge, b):
+				break
 			dist_sq = self.__line_to_point_dist_sq(edge, b)	
 			if dist_sq < snap_size_sq:
 				return False
@@ -212,7 +216,6 @@ class CityCell:
 			if cross_z > 0:
 				return False
 		return True
-			
 
 
 
@@ -233,6 +236,7 @@ class CityCell:
 		
 		grow = True
 		i = 0
+		max_iterations = 15
 		while grow:
 			grow = False
 			new_extremities = []
@@ -241,7 +245,10 @@ class CityCell:
 				if len(add_extremities) > 0:
 					grow = True
 					new_extremities = new_extremities + add_extremities
-			extremities = new_extremities	
+			extremities = new_extremities
+			i = i + 1
+			if i > max_iterations:
+				grow = False
 
 	
 	def create_blender_curve(self, name, parent):
