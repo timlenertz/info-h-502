@@ -23,10 +23,7 @@ class City:
 		root = bpy.data.objects.new(name=name, object_data=None)
 		
 		# Terrain
-		terrain_mesh = self.terrain.create_blender_mesh()
-		terrain_obj = bpy.data.objects.new('terrain', terrain_mesh)
-		terrain_obj.parent = root
-		scene.objects.link(terrain_obj)
+		self.terrain.create_blender_object(root)
 		
 		# Primary Roads
 		self.plan.primary_road_network.create_blender_roads(root)

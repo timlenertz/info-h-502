@@ -3,6 +3,7 @@ import random
 import math
 import bpy
 
+from . import assets
 
 class HeightMap:
 	"""Randomly generated height map, using diamond-square algorithm."""
@@ -105,6 +106,34 @@ class Terrain(HeightMap):
 		mesh.from_pydata(vertices, [], faces)
 		mesh.update(calc_edges=True)
 		return mesh
+	
+
+	def create_blender_object(self, parent):	
+		terrain_mesh = self.create_blender_mesh('terrain')
+		terrain_obj = bpy.data.objects.new('terrain', terrain_mesh)
+		terrain_obj.parent = parent
+		bpy.context.scene.objects.link(terrain_obj)
+		
+		mat = bpy.data.materials.new('terrain')
+		mat.diffuse_color = (1.0, 1.0, 1.0)
+		mat.diffuse_shader = 'LAMBERT'
+		mat.diffuse_intensity = 1.0
+		mat.specular_intensity = 0.0
+		mat.ambient = 1
+		terrain_obj.data.materials.append(mat)
+		
+		tex = assets.load_texture('terrain')
+		mtex = mat.texture_slots.add()
+		mtex.texture = tex
+		mtex.texture_coords = 'UV'
+		mtex.use_map_color_diffuse = True
+		mtex.use_map_color_emission = True
+		mtex.emission_color_factor = 0.5
+		mtex.use_map_density = True
+		mtex.mapping = 'FLAT'
+		
+		return terrain_obj		
+
 
 	
 	def height_at(self, x, y):

@@ -3,6 +3,7 @@ import random
 import math
 import scipy.spatial
 import bpy
+import networkx as nx
 
 from . import assets
 
@@ -16,6 +17,9 @@ class Plan:
 		self.terrain.generate()
 		self.primary_road_network.generate()
 
+
+class SecondaryRoadNetwork:
+	pass
 
 
 
@@ -86,26 +90,21 @@ class PrimaryRoadNetwork:
 				i = i + 1
 				self.intersection_points.append((px, py))
 		
-		# Build roads according to grid, but randomly leave out some segments
-		self.adjacency = []
-		for i in range(number_of_cells):
-			self.adjacency.append([])
-		
+		# Build roads graph according to grid
+		self.graph = nx.Graph()
 		for x in range(number_of_cells_x):
 			last = None
 			for y in range(number_of_cells_y):
 				c = intersection_point_grid[x, y]
 				if last != None:
-					self.adjacency[c].append(last)
-					self.adjacency[last].append(c)
+					self.graph.add_edge(last, c)
 				last = c
 		for y in range(number_of_cells_y):
 			last = None
 			for x in range(number_of_cells_x):
 				c = intersection_point_grid[x, y]
 				if last != None:
-					self.adjacency[c].append(last)
-					self.adjacency[last].append(c)
+					self.graph.add_edge(last, c)
 				last = c
 
 
@@ -170,16 +169,20 @@ class PrimaryRoadNetwork:
 		road_points.append(dst)
 		return road_points
 	
+	@staticmethod
+	def __road_key(a, b):
+		return frozenset([a, b])
 	
 	def __create_low_level_graph(self):
 		self.roads = dict()
-		for a, adj in enumerate(self.adjacency):
-			for b in adj:
-				if a < b:
-					road = self.__create_road(a, b)
-					key = str(a) + ' ' + str(b)
-					self.roads[key] = road
+		for a, b in self.graph.edges_iter():
+			road = self.__create_road(a, b)
+			key = str(a) + ' ' + str(b)
+			self.roads[self.__road_key(a, b)] = road
 	
+	
+	def __create_city_cells(self):
+		self.city_cells = nx.cycle_basis(self.graph)
 
 	def __create_blender_curve_for_road(self, name, road):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
@@ -202,9 +205,7 @@ class PrimaryRoadNetwork:
 		road = assets.load_object('primary_road')
 		road.name = name
 		road.location = (0.0, 0.0, 0.0)
-		
-		curve.parent = road
-		
+				
 		array_modifier = road.modifiers.new("Array", type='ARRAY')
 		array_modifier.fit_type = 'FIT_CURVE'
 		array_modifier.curve = curve
@@ -215,9 +216,14 @@ class PrimaryRoadNetwork:
 		if 'terrain' in bpy.context.scene.objects:
 			shrinkwrap_modifier = road.modifiers.new("Shrinkwrap", type='SHRINKWRAP')
 			shrinkwrap_modifier.target = bpy.context.scene.objects['terrain']
+			shrinkwrap_modifier.use_keep_above_surface = True
+			shrinkwrap_modifier.offset = 0.2
 
 		bpy.context.scene.objects.link(curve)
 		bpy.context.scene.objects.link(road)
+		
+		curve.parent = parent
+		road.parent = parent
 		
 		return road
 		
@@ -231,11 +237,11 @@ class PrimaryRoadNetwork:
 		for key in self.roads:
 			i = i + 1
 			road = self.roads[key]
-			obj = self.__create_blender_road(parent, 'primary_road_' + str(i), road)
-			obj.parent = parent
+			self.__create_blender_road(parent, 'primary_road_' + str(i), road)
 			
 		return parent
 			
 	def generate(self):
 		self.__create_high_level_graph()
 		self.__create_low_level_graph()
+		self.__create_city_cells()
