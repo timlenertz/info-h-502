@@ -67,6 +67,16 @@ class CityCell:
 		ab = (ab[0] / seg_length, ab[1] / seg_length)
 		dot = ab[0]*ap[0] + ab[1]*ap[1]
 		return (dot > 0) and (dot < seg_length)
+	
+	@staticmethod
+	def __project_on_segment(seg, p):
+		a, b = seg
+		seg_length = CityCell.__distance(*seg)
+		ap = (p[0] - a[0], p[1] - a[1])
+		ab = (b[0] - a[0], b[1] - a[1])
+		ab = (ab[0] / seg_length, ab[1] / seg_length)
+		dot = ab[0]*ap[0] + ab[1]*ap[1]
+		return (a[0] + dot*ab[0], a[1] + dot*ab[1])
 
 	@staticmethod
 	def __segment_intersection(seg1, seg2):
@@ -95,21 +105,17 @@ class CityCell:
 			i = math.floor(n * r)
 			a, b = road[i], road[i+1]
 				
-			# Random position on that segment
-			r = random.uniform(0.0, 1.0)
-			px = a[0] + r * (b[0] - a[0])
-			py = a[1] + r * (b[1] - a[1])
-			p = (px, py)
 			edge = (a, b)
-			points.append((p, edge))
+			points.append((a, edge))
 		
 		return points
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 40.0
-		self.snap_size = 25.0
+		self.segment_size = 30.0
+		self.snap_size = 40.0
 		self.degree = 3
+		self.join_probability = 0.2
 		
 		
 	def __grow_from(self, pt):
@@ -135,30 +141,28 @@ class CityCell:
 			dy = self.segment_size * np.sin(angle)
 			new_pt = (pt[0] + dx, pt[1] + dy)
 			new_edge = (pt, new_pt)
-			snap = self.__snap(new_edge)
+			join = (random.uniform(0.0, 1.0) < self.join_probability)
+			snap = self.__snap(new_edge, join)
 			if not snap:
 				self.graph.add_edge(*new_edge)
 				new_extremities.append(new_pt)
 		
 		return new_extremities
 	
-	def __snap(self, new_edge):
-		if not self.__inside_cycle_test(new_edge):
+	def __snap(self, new_edge, join):
+		if not self.__inside_cycle_test(new_edge, join):
 			return True
-		elif not self.__node_distance_test(new_edge):
-			print("1 failed")
+		elif not self.__node_distance_test(new_edge, join):
 			return True
-		elif not self.__edge_distance_test(new_edge):
-			print("3 failed")
+		elif not self.__edge_distance_test(new_edge, join):
 			return True
-		elif not self.__edge_intersection_test(new_edge):
-			print("2 failed")
+		elif not self.__edge_intersection_test(new_edge, join):
 			return True
 		else:
 			return False
 		
 		
-	def __node_distance_test(self, new_edge):
+	def __node_distance_test(self, new_edge, join):
 		a, b = new_edge
 		snap_size_sq = self.snap_size**2
 			
@@ -180,12 +184,14 @@ class CityCell:
 				dist_sq = (b[0] - c[0])**2 + (b[1] - c[1])**2
 				
 			if dist_sq < snap_size_sq:
+				if join and (c not in nx.all_neighbors(self.graph, a)):
+					self.graph.add_edge(a, c)
 				return False
 	
 		return True
 	
 	
-	def __edge_distance_test(self, new_edge):
+	def __edge_distance_test(self, new_edge, join):
 		a, b = new_edge
 		snap_size_sq = self.snap_size**2
 
@@ -194,26 +200,47 @@ class CityCell:
 				break
 			dist_sq = self.__line_to_point_dist_sq(edge, b)	
 			if dist_sq < snap_size_sq:
+				if join and (a != edge[0]) and (a != edge[1]):
+					proj = CityCell.__project_on_segment(edge, b)
+					c, d = edge
+					self.graph.remove_edge(c, d)
+					self.graph.add_edge(c, proj)
+					self.graph.add_edge(proj, d)
+					self.graph.add_edge(a, proj)
 				return False
 
 		return True
 	
-	def __edge_intersection_test(self, new_edge):
+	def __edge_intersection_test(self, new_edge, join):
+		a, b = new_edge
 		for edge in self.graph.edges_iter():
 			if self.__segment_intersection(edge, new_edge):
+				if join and (edge[0] not in nx.all_neighbors(self.graph, a)) and (edge[1] not in nx.all_neighbors(self.graph, a)):
+					proj = CityCell.__project_on_segment(edge, b)
+					c, d = edge
+					self.graph.remove_edge(c, d)
+					self.graph.add_edge(c, proj)
+					self.graph.add_edge(proj, d)
+					self.graph.add_edge(a, proj)
 				return False
 		return True
 
 		
-	def __inside_cycle_test(self, new_edge):
+	def __inside_cycle_test(self, new_edge, join):
 		a, b = new_edge
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
+		snap_size_sq = self.snap_size**2
 
 		for cycle_edge in self.cycle:
 			u = vec(cycle_edge[0], cycle_edge[1])
 			v = vec(cycle_edge[0], b)
 			cross_z = u[0]*v[1] - u[1]*v[0];
-			if cross_z > 0:
+			if (cross_z > 0) or (self.__line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
+				if join:
+					road = self.road_network.road_for_edge(*cycle_edge)
+					dist = lambda p: (p[0] - a[0])**2 + (p[1] - a[1])**2
+					p = min(road, key=dist)
+					self.graph.add_edge(a, p)
 				return False
 		return True
 
@@ -425,6 +452,11 @@ class RoadNetwork:
 			road = road[:]
 			road.reverse()
 		return road
+
+	def road_for_edge(self, a, b):
+		key = self.__road_key(a, b)
+		return self.roads[key]
+
 	
 	def __create_low_level_graph(self):
 		self.roads = dict()
