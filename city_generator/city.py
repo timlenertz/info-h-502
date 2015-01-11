@@ -7,7 +7,7 @@ import os
 from . import plan, terrain
 
 
-class City:
+class City(object):
 	def __init__(self):
 		self.terrain = terrain.Terrain()
 		self.plan = plan.Plan(self.terrain)

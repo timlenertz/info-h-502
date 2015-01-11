@@ -5,7 +5,7 @@ import bpy
 
 from . import assets
 
-class HeightMap:
+class HeightMap(object):
 	"""Randomly generated height map, using diamond-square algorithm."""
 	initial_height_range = (0.0, 1.0)
 	roughness = 0.6
