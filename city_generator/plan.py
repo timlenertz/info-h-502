@@ -237,12 +237,6 @@ class RoadNetwork(object):
 		curve_modifier = road.modifiers.new("Curve", type='CURVE')
 		curve_modifier.object = curve
 		
-		#if 'terrain' in bpy.context.scene.objects:
-		#	shrinkwrap_modifier = road.modifiers.new("Shrinkwrap", type='SHRINKWRAP')
-		#	shrinkwrap_modifier.target = bpy.context.scene.objects['terrain']
-		#	shrinkwrap_modifier.use_keep_above_surface = True
-		#	shrinkwrap_modifier.offset = 0.2
-
 		bpy.context.scene.objects.link(curve)
 		bpy.context.scene.objects.link(road)
 		
@@ -267,9 +261,10 @@ class RoadNetwork(object):
 			cell_parent = bpy.data.objects.new('city_cell_' + str(i), None)
 			bpy.context.scene.objects.link(cell_parent)
 			cell_parent.parent = root
-			cell.create_blender_curve('roads', cell_parent)
+			cell.create_blender_roads(cell_parent)
 		
 		return parent
+	
 			
 	def generate(self):
 		self.__create_high_level_graph()

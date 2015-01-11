@@ -212,8 +212,8 @@ class OBJECT_OT_DeleteCity(bpy.types.Operator):
 	bl_description = "Delete city with the given name."
 	
 	def execute(self, context):
-		city = bpy.data.objects.get(context.scene.city_name)
-		if city is not None:
+		if context.scene.city_name in bpy.data.objects:
+			city = bpy.data.objects.get(context.scene.city_name)
 			bpy.ops.object.select_all(action='DESELECT')
 			bpy.context.scene.objects.active = city
 			city.select = True

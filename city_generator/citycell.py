@@ -19,6 +19,7 @@ class Cell(object):
 
 		self.cycle = []
 		self.road_network = road_network
+		self.terrain = self.road_network.terrain
 		first = cycle[0]
 		last = first
 		for node in cycle[1:]:
@@ -91,10 +92,10 @@ class RoadsCell(Cell):
 	
 	
 	def __choose_control_parameters(self):
-		self.segment_size = 15.0
-		self.snap_size = 5.0
+		self.segment_size = 30.0
+		self.snap_size = 20.0
 		self.degree = 3
-		self.join_probability = 0.2
+		self.join_probability = 0.4
 		
 		
 	def __grow_from(self, pt):
@@ -131,11 +132,11 @@ class RoadsCell(Cell):
 	def __snap(self, new_edge, join):
 		if not self.__inside_cycle_test(new_edge, join):
 			return True
+		elif not self.__edge_intersection_test(new_edge, join):
+			return True
 		elif not self.__node_distance_test(new_edge, join):
 			return True
 		elif not self.__edge_distance_test(new_edge, join):
-			return True
-		elif not self.__edge_intersection_test(new_edge, join):
 			return True
 		else:
 			return False
@@ -222,19 +223,51 @@ class RoadsCell(Cell):
 					self.graph.add_edge(a, p)
 				return False
 		return True
-		
 	
-	def create_blender_curve(self, name, parent):
+		
+	def __create_blender_road(self, name, parent, edge):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
-
-		for a, b in self.graph.edges_iter():
-			polyline = curve.splines.new('POLY')
-			polyline.points.add(1)
-			polyline.points[0].co = (a[0], a[1], 0.0, 1.0)
-			polyline.points[1].co = (b[0], b[1], 0.0, 1.0)
+		
+		a, b = edge
+		polyline = curve.splines.new('POLY')
+		polyline.points.add(1)
+		polyline.points[0].co = (a[0], a[1], self.terrain.height_at(*a), 1.0)
+		polyline.points[1].co = (b[0], b[1], self.terrain.height_at(*b), 1.0)
 		
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
 		curve_obj.parent = parent
+
+			
+		road = assets.load_object('secondary_road')
+		road.name = name
+		road.parent = parent
+		
+		length = util.distance(*edge)
+		segment_length = road.dimensions.x
+
+		scale = length / segment_length
+		road.scale[0] = scale
+		road.material_slots[0].material.texture_slots[0].scale[1] = scale
+		
+		curve_modifier = road.modifiers.new("Curve", type='CURVE')
+		curve_modifier.object = curve_obj
+		
 		bpy.context.scene.objects.link(curve_obj)
-		return curve_obj
+		bpy.context.scene.objects.link(road)
+		
+		
+		return road
+
+		
+	def create_blender_roads(self, root):
+		parent = bpy.data.objects.new('secondary_roads', None)
+		parent.parent = root
+		bpy.context.scene.objects.link(parent)
+
+		i = 0
+		for edge in self.graph.edges_iter():
+			self.__create_blender_road('secondary_road_'+str(i), parent, edge)
+			i = i + 1
+		
+		return parent
