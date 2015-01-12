@@ -8,6 +8,7 @@ from . import assets, util
 
 class Cell(object):
 	"""City cell encloded by primary road cycle."""
+	
 	def __init__(self, road_network, cycle):
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
 
@@ -26,7 +27,16 @@ class Cell(object):
 			self.cycle.append((last, node))
 			last = node
 		self.cycle.append((last, first))
+		
+	def create_blender_object(self, root):
+		pass
+	
+	def generate(self):
+		pass
 
+
+class LakeCell(Cell):
+	pass
 
 
 class RoadsCell(Cell):
@@ -260,7 +270,7 @@ class RoadsCell(Cell):
 		return road
 
 		
-	def create_blender_roads(self, root):
+	def create_blender_object(self, root):
 		parent = bpy.data.objects.new('secondary_roads', None)
 		parent.parent = root
 		bpy.context.scene.objects.link(parent)

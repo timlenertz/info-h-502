@@ -181,9 +181,7 @@ class OBJECT_OT_GenerateCity(bpy.types.Operator):
 	bl_label = "Generate new city"
 	bl_description = "Generate city with given parameters."
 		
-	def execute(self, context):
-		bpy.ops.city.delete()
-	
+	def execute(self, context):	
 		scene = context.scene
 		cit = city.City()
 		cit.terrain.roughness = scene.terrain_roughness

@@ -26,6 +26,6 @@ class City(object):
 		self.terrain.create_blender_object(root)
 		
 		# Primary Roads
-		self.plan.road_network.create_blender_roads(root)
+		self.plan.road_network.create_blender_object(root)
 		
 		return root

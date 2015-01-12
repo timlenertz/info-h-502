@@ -4,7 +4,7 @@ import math
 import bpy
 import networkx as nx
 
-from . import assets, citycell
+from . import assets, citycell, util
 
 class Plan(object):
 	"""Plan of the city, consisting of road map and outlines for buildings."""
@@ -188,7 +188,15 @@ class RoadNetwork(object):
 			self.roads[self.__road_key(a, b)] = road
 	
 	
+	def __create_city_cell(self, cycle, remoteness):
+		if remoteness < 0.3:
+			return citycell.RoadsCell(self, cycle)
+		else:
+			return citycell.Cell(self, cycle)
+	
 	def __create_city_cells(self):
+		# Get cycles in primary road network
+		# = minimum cycle basis of graph
 		cycles = []
 		cells_x, cells_y = self.intersection_point_grid.shape
 		for y in range(0, cells_y - 1):
@@ -199,10 +207,25 @@ class RoadNetwork(object):
 				d = self.intersection_points[self.intersection_point_grid[x, y + 1]]
 				cycles.append([a, b, c, d])
 	
-		self.city_cells = []
-		
+		cycles = util.planar_graph_cycles(self.graph)
+	
+		# Randomly choose point representing city center near terrain center point
+		half_w = self.terrain.width / 2
+		city_center_x = half_w + half_w*random.normalvariate(0.0, 0.3)
+		city_center_y = half_w + half_w*random.normalvariate(0.0, 0.3)
+		city_center = (city_center_x, city_center_y)
+	
+		self.city_cells = []		
 		for cycle in cycles:
-			city_cell = citycell.RoadsCell(self, cycle)
+			center = (0.0, 0.0)
+			for x, y in cycle:
+				cent = (center[0] + x, center[1] + y)
+			n = float(len(cycle))
+			center = (center[0] / n, center[1] / n)
+			
+			remoteness = util.distance(cent, city_center) / (self.terrain.width * math.sqrt(2.0))
+		
+			city_cell = self.__create_city_cell(cycle, remoteness)
 			city_cell.generate()
 			self.city_cells.append(city_cell)
 
@@ -244,7 +267,7 @@ class RoadNetwork(object):
 		return road
 		
 		
-	def create_blender_roads(self, root):
+	def create_blender_object(self, root):
 		parent = bpy.data.objects.new('primary_roads', None)
 		parent.parent = root
 		bpy.context.scene.objects.link(parent)
@@ -261,7 +284,7 @@ class RoadNetwork(object):
 			cell_parent = bpy.data.objects.new('city_cell_' + str(i), None)
 			bpy.context.scene.objects.link(cell_parent)
 			cell_parent.parent = root
-			cell.create_blender_roads(cell_parent)
+			cell.create_blender_object(cell_parent)
 		
 		return parent
 	
