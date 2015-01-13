@@ -78,13 +78,17 @@ class LakeCell(Cell):
 				p = self.terrain.to_terrain(im_x, im_y)
 				
 				emboss = 0.0
-				dist = +np.inf
 				for center, radius in centers:
-					dist = min(dist, util.distance(center, p))
+					dist = util.distance(center, p)
 					if dist < radius:
 						emboss += (radius - dist)**2 / radius**2
 				
-				self.terrain.image[im_y][im_x] -= emboss
+				noise = random.uniform(-1.0, 1.0)
+				amplitude = 0.0
+				if util.distance(p, cell_center) < cell_center_to_boundary:
+					amplitude = util.distance(p, cell_center) / cell_center_to_boundary
+				
+				self.terrain.image[im_y][im_x] -= 1.3*emboss + 0.3*amplitude*noise
 	
 
 	def create_blender_object(self, root):
@@ -117,7 +121,7 @@ class LakeCell(Cell):
 			height = self.terrain.height_at(*a)
 			if height < self.level:
 				self.level = height
-		self.level -= 3.0
+		self.level -= 0.3
 
 
 
