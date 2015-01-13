@@ -132,17 +132,24 @@ class Terrain(HeightMap):
 		mtex.use_map_density = True
 		mtex.mapping = 'FLAT'
 		
-		return terrain_obj		
-
-
+		return terrain_obj
 	
-	def height_at(self, x, y):
+	
+	def to_image(self, x, y):
 		x_ind = int(math.floor(x * self.side_length / self.width))
 		x_ind = min(x_ind, self.side_length - 1)
-		x_ind = max(x_ind, 0)
-					
+		x_ind = max(x_ind, 0)			
 		y_ind = int(math.floor(y * self.side_length / self.width))
 		y_ind = min(y_ind, self.side_length - 1)
 		y_ind = max(y_ind, 0)
+		return (x_ind, y_ind)
 	
+	def to_terrain(self, x_ind, y_ind):
+		x = x_ind * self.width / self.side_length
+		y = y_ind * self.width / self.side_length
+		return (x, y)
+	
+	
+	def height_at(self, x, y):
+		x_ind, y_ind = self.to_image(x, y)
 		return self.height * self.image[y_ind, x_ind]

@@ -190,35 +190,18 @@ class RoadNetwork(object):
 	
 	def __create_city_cell(self, cycle, remoteness):
 		if remoteness < 0.3:
-			return citycell.RoadsCell(self, cycle)
+			return citycell.BuildingsCell(self, cycle)
 		else:
-			return citycell.Cell(self, cycle)
+			return citycell.LakeCell(self, cycle)
 	
 	def __create_city_cells(self):
 		# Get cycles in primary road network
 		# = minimum cycle basis of graph
-		cycles = []
-		cells_x, cells_y = self.intersection_point_grid.shape
-		for y in range(0, cells_y - 1):
-			for x in range(0, cells_x - 1):
-				a = self.intersection_points[self.intersection_point_grid[x, y]]
-				b = self.intersection_points[self.intersection_point_grid[x + 1, y]]
-				c = self.intersection_points[self.intersection_point_grid[x + 1, y + 1]]
-				d = self.intersection_points[self.intersection_point_grid[x, y + 1]]
-				cycles.append([a, b, c, d])
-
 		cycles = mcb.planar_graph_cycles(self.graph)
-		cycles = [cycle for cycle in cycles if len(cycle) == 4]
-		for cycle in cycles:
-			print(len(cycle))
-		print("---")
-		print(len(cycles))
 	
 		# Randomly choose point representing city center near terrain center point
 		half_w = self.terrain.width / 2
-		city_center_x = half_w + half_w*random.normalvariate(0.0, 0.3)
-		city_center_y = half_w + half_w*random.normalvariate(0.0, 0.3)
-		city_center = (city_center_x, city_center_y)
+		city_center = (half_w, half_w)
 	
 		self.city_cells = []		
 		for cycle in cycles:
@@ -250,8 +233,18 @@ class RoadNetwork(object):
 		curve_obj.parent = parent
 		return curve_obj
 	
+	@staticmethod
+	def __road_length(road):
+		l = 0
+		last = road[0]
+		for curr in road[1:]:
+			l += util.distance(last, curr)
+			last = curr
+		return l
+	
 	def __create_blender_road(self, parent, name, road):
 		curve = self.__create_blender_curve_for_road(parent, name, road)
+		road_len = self.__road_length(road)
 		
 		road = assets.load_object('primary_road')
 		road.name = name
@@ -259,15 +252,14 @@ class RoadNetwork(object):
 		road.parent = parent
 				
 		array_modifier = road.modifiers.new("Array", type='ARRAY')
-		array_modifier.fit_type = 'FIT_CURVE'
-		array_modifier.curve = curve
+		array_modifier.fit_type = 'FIT_LENGTH'
+		array_modifier.fit_length = road_len
 
 		curve_modifier = road.modifiers.new("Curve", type='CURVE')
 		curve_modifier.object = curve
 		
 		bpy.context.scene.objects.link(curve)
 		bpy.context.scene.objects.link(road)
-		
 		
 		return road
 		

@@ -18,9 +18,11 @@ class City(object):
 		
 	def create_blender_object(self, name):
 		scene = bpy.context.scene
-			
+		scale = 0.1
+						
 		# Root
 		root = bpy.data.objects.new(name=name, object_data=None)
+		root.scale = (scale, scale, scale)
 		
 		# Terrain
 		self.terrain.create_blender_object(root)

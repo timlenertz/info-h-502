@@ -1,7 +1,12 @@
+# based on The Minimal Cycle Basis for a Planar Graph (David Eberly)
+
 import networkx as nx
 import functools
 
 class Primitive:
+	type = None # Can be 'ISOLATED_VERTEX', 'FILAMENT', 'MINIMAL_CYCLE'
+	vertices = None
+
 	def __init__(self, type):
 		self.vertices = []
 		self.type = type
@@ -107,7 +112,9 @@ def get_clockwise_most(graph, vprev, vcurr):
 		if vadj is not vprev:
 			vnext = vadj
 			break
-			
+	if vnext is None:
+		return None
+		
 	if vprev is not None:
 		dcurr = (vcurr[0] - vprev[0], vcurr[1] - vprev[1])
 	else:
@@ -143,6 +150,8 @@ def get_counterclockwise_most(graph, vprev, vcurr):
 		if vadj is not vprev:
 			vnext = vadj
 			break
+	if vnext is None:
+		return None
 	
 	if vprev is not None:
 		dcurr = (vcurr[0] - vprev[0], vcurr[1] - vprev[1])

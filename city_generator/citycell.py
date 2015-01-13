@@ -4,11 +4,10 @@ import math
 import bpy
 import networkx as nx
 
-from . import assets, util	
+from . import assets, util, mcb	
 
 class Cell(object):
-	"""City cell encloded by primary road cycle."""
-	
+	"""City cell enclosed by primary road cycle."""
 	def __init__(self, road_network, cycle):
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
 
@@ -27,6 +26,14 @@ class Cell(object):
 			self.cycle.append((last, node))
 			last = node
 		self.cycle.append((last, first))
+	
+	def bounding_box(self):
+		lo = (+np.inf, +np.inf)
+		hi = (-np.inf, -np.inf)
+		for a, b in self.cycle:
+			hi = (max(hi[0], a[0]), max(hi[1], a[1]))
+			lo = (min(lo[0], a[0]), min(lo[1], a[1]))
+		return (lo, hi)
 		
 	def create_blender_object(self, root):
 		pass
@@ -36,7 +43,82 @@ class Cell(object):
 
 
 class LakeCell(Cell):
-	pass
+	"""Cell containing lake. Embosses terrain and adds water surface."""
+	def __init__(self, road_network, cycle):
+		super(LakeCell, self).__init__(road_network, cycle)
+	
+	def __emboss_terrain(self):
+		lo, hi = self.bounding_box()
+		
+		def dist_to_boundary(p):
+			dist = +np.inf
+			for edge in self.cycle:
+				d = util.line_to_point_dist(edge, p)
+				dist = min(dist, d)
+			return dist
+		
+		cell_center = ((lo[0] + hi[0])/2, (lo[1] + hi[1])/2)
+		cell_center_to_boundary = dist_to_boundary(cell_center)
+		max_dist = (hi[0] - lo[0]) + (hi[1] - lo[1])
+		
+		centers = []
+		num_centers = random.randint(1, 4)
+		for i in range(num_centers):
+			max_div = 0.3 * cell_center_to_boundary
+			dx = max_div * random.uniform(-1.0, 1.0)
+			dy = max_div * random.uniform(-1.0, 1.0)
+			center = (cell_center[0] + dx, cell_center[1] + dy)
+			centers.append( (center, dist_to_boundary(center)) )
+		
+		lo = self.terrain.to_image(*lo)
+		hi = self.terrain.to_image(*hi)
+		
+		for im_x in range(lo[0], hi[0]):
+			for im_y in range(lo[1], hi[1]):
+				p = self.terrain.to_terrain(im_x, im_y)
+				
+				emboss = 0.0
+				dist = +np.inf
+				for center, radius in centers:
+					dist = min(dist, util.distance(center, p))
+					if dist < radius:
+						emboss += (radius - dist)**2 / radius**2
+				
+				self.terrain.image[im_y][im_x] -= emboss
+	
+
+	def create_blender_object(self, root):
+		# Mesh
+		vertices = []
+		for a, b in self.cycle:
+			vert = (a[0], a[1], self.level)
+			vertices.append(vert)
+		faces = [[]]
+		for i in range(len(vertices)):
+			faces[0].append(i)
+					
+		# Object
+		mesh = bpy.data.meshes.new('water')
+		mesh.from_pydata(vertices, [], faces)
+		mesh.update(calc_edges=True)
+
+		water_obj = bpy.data.objects.new('water', mesh)
+		water_obj.parent = root
+		bpy.context.scene.objects.link(water_obj)
+	
+		return water_obj
+
+	
+	def generate(self):
+		self.__emboss_terrain()
+		
+		self.level = +np.inf
+		for a, b in self.cycle:
+			height = self.terrain.height_at(*a)
+			if height < self.level:
+				self.level = height
+		self.level -= 3.0
+
 
 
 class RoadsCell(Cell):
@@ -266,10 +348,17 @@ class RoadsCell(Cell):
 		bpy.context.scene.objects.link(curve_obj)
 		bpy.context.scene.objects.link(road)
 		
-		
 		return road
 
-		
+
+	def full_graph(self):
+		"""Graph combining secondary roads and surrounding primary road cycle."""
+		cycle_graph = nx.Graph()
+		for edge in self.cycle:
+			cycle_graph.add_edge(*edge)
+		return nx.compose(self.graph, cycle_graph)
+	
+	
 	def create_blender_object(self, root):
 		parent = bpy.data.objects.new('secondary_roads', None)
 		parent.parent = root
@@ -281,3 +370,19 @@ class RoadsCell(Cell):
 			i = i + 1
 		
 		return parent
+
+
+class BuildingsCell(RoadsCell):
+	"""Roads city cell with buildings."""
+	def __init__(self, road_network, cycle):
+		super(BuildingsCell, self).__init__(road_network, cycle)
+	
+	def __generate_blocks(self):
+		full_graph = self.full_graph()
+		self.blocks = mcb.planar_graph_cycles(full_graph)
+	
+	def generate(self):
+		super(BuildingsCell, self).generate()
+	
+		self.__generate_blocks()
+		
