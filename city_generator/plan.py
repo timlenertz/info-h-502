@@ -4,7 +4,7 @@ import math
 import bpy
 import networkx as nx
 
-from . import assets, citycell, util
+from . import assets, citycell, util, mcb
 
 class Plan(object):
 	"""Plan of the city, consisting of road map and outlines for buildings."""
@@ -206,8 +206,13 @@ class RoadNetwork(object):
 				c = self.intersection_points[self.intersection_point_grid[x + 1, y + 1]]
 				d = self.intersection_points[self.intersection_point_grid[x, y + 1]]
 				cycles.append([a, b, c, d])
-	
-		cycles = util.planar_graph_cycles(self.graph)
+
+		cycles = mcb.planar_graph_cycles(self.graph)
+		cycles = [cycle for cycle in cycles if len(cycle) == 4]
+		for cycle in cycles:
+			print(len(cycle))
+		print("---")
+		print(len(cycles))
 	
 		# Randomly choose point representing city center near terrain center point
 		half_w = self.terrain.width / 2

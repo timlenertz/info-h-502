@@ -19,8 +19,9 @@ if 'bpy' in locals():
 	imp.reload(assets)
 	imp.reload(citycell)
 	imp.reload(util)
+	imp.reload(mcb)
 else:
-	from . import city, plan, terrain, assets, citycell, util
+	from . import city, plan, terrain, assets, citycell, util, mcb
 	import bpy
 
 
