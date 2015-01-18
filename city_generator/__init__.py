@@ -20,8 +20,9 @@ if 'bpy' in locals():
 	imp.reload(citycell)
 	imp.reload(util)
 	imp.reload(mcb)
+	imp.reload(block)
 else:
-	from . import city, plan, terrain, assets, citycell, util, mcb
+	from . import city, plan, terrain, assets, citycell, util, mcb, block
 	import bpy
 
 
@@ -217,6 +218,7 @@ class OBJECT_OT_DeleteCity(bpy.types.Operator):
 			bpy.context.scene.objects.active = city
 			city.select = True
 			bpy.ops.object.select_grouped(type='CHILDREN_RECURSIVE', extend=True)
+			#bpy.ops.object.select_hierarchy(direction='CHILD', extend=True)
 			bpy.ops.object.delete(use_global=False)
 		
 		return { 'FINISHED' }

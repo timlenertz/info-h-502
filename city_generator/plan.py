@@ -170,7 +170,7 @@ class RoadNetwork(object):
 	def oriented_road_for_edge(self, a, b):
 		key = self.__road_key(a, b)
 		road = self.roads[key]
-		if road[-1] == b:
+		if road[-1] == a:
 			road = road[:]
 			road.reverse()
 		return road
@@ -189,10 +189,27 @@ class RoadNetwork(object):
 	
 	
 	def __create_city_cell(self, cycle, remoteness):
+		road_cycle = self.road_cycle(cycle)
 		if remoteness < 0.3:
-			return citycell.BuildingsCell(self, cycle)
+			return citycell.BlocksCell(self, cycle, road_cycle)
 		else:
-			return citycell.LakeCell(self, cycle)
+			return citycell.LakeCell(self, cycle, road_cycle)
+	
+	def road_cycle(self, cycle):
+		road_cyc = []
+		
+		def add_road(a, b):
+			road = self.oriented_road_for_edge(a, b)
+			for p in road[:-2]:
+				road_cyc.append(p)
+		
+		a = cycle[0]
+		for b in cycle[1:]:
+			add_road(a, b)
+			a = b
+		add_road(a, cycle[0])
+		
+		return road_cyc
 	
 	def __create_city_cells(self):
 		# Get cycles in primary road network
@@ -204,18 +221,18 @@ class RoadNetwork(object):
 		city_center = (half_w, half_w)
 	
 		self.city_cells = []		
-		for cycle in cycles:
+		for cycle in cycles:		
 			center = (0.0, 0.0)
 			for x, y in cycle:
 				cent = (center[0] + x, center[1] + y)
 			n = float(len(cycle))
 			center = (center[0] / n, center[1] / n)
-			
 			remoteness = util.distance(cent, city_center) / (self.terrain.width * math.sqrt(2.0))
 		
 			city_cell = self.__create_city_cell(cycle, remoteness)
 			city_cell.generate()
 			self.city_cells.append(city_cell)
+
 
 	def __create_blender_curve_for_road(self, parent, name, road):
 		curve = bpy.data.curves.new(name=name, type='CURVE')

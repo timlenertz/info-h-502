@@ -4,37 +4,52 @@ import math
 import bpy
 import networkx as nx
 
-from . import assets, util, mcb	
+from . import assets, util, mcb, block
 
 class Cell(object):
+	hi_cycle = None # High-level cycle of enclosing primary roads
+	lo_cycle = None # Low-level cycle of enclosing primary roads
+	# Both as list of vertices in clockwise order
+
 	"""City cell enclosed by primary road cycle."""
-	def __init__(self, road_network, cycle):
+	def __init__(self, road_network, hi_cycle, lo_cycle):
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
 
-		u = vec(cycle[0], cycle[1])
-		v = vec(cycle[1], cycle[2])
+		u = vec(hi_cycle[0], hi_cycle[1])
+		v = vec(hi_cycle[1], hi_cycle[2])
 		cross_z = u[0]*v[1] - u[1]*v[0];
-		if cross_z > 0:
-			cycle.reverse()
+		if cross_z < 0:
+			hi_cycle.reverse()
+			lo_cycle.reverse()
 
-		self.cycle = []
+		self.hi_cycle = hi_cycle
+		self.lo_cycle = lo_cycle
 		self.road_network = road_network
 		self.terrain = self.road_network.terrain
-		first = cycle[0]
-		last = first
-		for node in cycle[1:]:
-			self.cycle.append((last, node))
-			last = node
-		self.cycle.append((last, first))
 	
 	def bounding_box(self):
 		lo = (+np.inf, +np.inf)
 		hi = (-np.inf, -np.inf)
-		for a, b in self.cycle:
-			hi = (max(hi[0], a[0]), max(hi[1], a[1]))
-			lo = (min(lo[0], a[0]), min(lo[1], a[1]))
+		for p in self.hi_cycle:
+			hi = (max(hi[0], p[0]), max(hi[1], p[1]))
+			lo = (min(lo[0], p[0]), min(lo[1], p[1]))
 		return (lo, hi)
-		
+	
+	def hi_cycle_edges(self):
+		prev = self.hi_cycle[0]
+		for curr in self.hi_cycle[1:]:
+			yield (prev, curr)
+			prev = curr
+		yield (prev, self.hi_cycle[0])
+
+	def lo_cycle_edges(self):
+		prev = self.lo_cycle[0]
+		for curr in self.lo_cycle[1:]:
+			yield (prev, curr)
+			prev = curr
+		yield (prev, self.lo_cycle[0])
+
+
 	def create_blender_object(self, root):
 		pass
 	
@@ -44,22 +59,22 @@ class Cell(object):
 
 class LakeCell(Cell):
 	"""Cell containing lake. Embosses terrain and adds water surface."""
-	def __init__(self, road_network, cycle):
-		super(LakeCell, self).__init__(road_network, cycle)
+	def __init__(self, road_network, hi_cycle, lo_cycle):
+		super(LakeCell, self).__init__(road_network, hi_cycle, lo_cycle)
 	
 	def __emboss_terrain(self):
-		lo, hi = self.bounding_box()
+		mn, mx = self.bounding_box()
 		
 		def dist_to_boundary(p):
 			dist = +np.inf
-			for edge in self.cycle:
+			for edge in self.lo_cycle_edges():
 				d = util.line_to_point_dist(edge, p)
 				dist = min(dist, d)
 			return dist
 		
-		cell_center = ((lo[0] + hi[0])/2, (lo[1] + hi[1])/2)
+		cell_center = ((mn[0] + mx[0])/2, (mn[1] + mx[1])/2)
 		cell_center_to_boundary = dist_to_boundary(cell_center)
-		max_dist = (hi[0] - lo[0]) + (hi[1] - lo[1])
+		max_dist = (mx[0] - mn[0]) + (mx[1] - mn[1])
 		
 		centers = []
 		num_centers = random.randint(1, 4)
@@ -70,11 +85,11 @@ class LakeCell(Cell):
 			center = (cell_center[0] + dx, cell_center[1] + dy)
 			centers.append( (center, dist_to_boundary(center)) )
 		
-		lo = self.terrain.to_image(*lo)
-		hi = self.terrain.to_image(*hi)
+		mn = self.terrain.to_image(*mn)
+		mx = self.terrain.to_image(*mx)
 		
-		for im_x in range(lo[0], hi[0]):
-			for im_y in range(lo[1], hi[1]):
+		for im_x in range(mn[0], mx[0]):
+			for im_y in range(mn[1], mx[1]):
 				p = self.terrain.to_terrain(im_x, im_y)
 				
 				emboss = 0.0
@@ -94,7 +109,7 @@ class LakeCell(Cell):
 	def create_blender_object(self, root):
 		# Mesh
 		vertices = []
-		for a, b in self.cycle:
+		for a, b in self.lo_cycle_edges():
 			vert = (a[0], a[1], self.level)
 			vertices.append(vert)
 		faces = [[]]
@@ -117,8 +132,8 @@ class LakeCell(Cell):
 		self.__emboss_terrain()
 		
 		self.level = +np.inf
-		for a, b in self.cycle:
-			height = self.terrain.height_at(*a)
+		for p in self.lo_cycle:
+			height = self.terrain.height_at(*p)
 			if height < self.level:
 				self.level = height
 		self.level -= 0.3
@@ -127,8 +142,8 @@ class LakeCell(Cell):
 
 class RoadsCell(Cell):
 	"""City cell which contains secondary roads."""
-	def __init__(self, road_network, cycle):
-		super(RoadsCell, self).__init__(road_network, cycle)
+	def __init__(self, road_network, hi_cycle, lo_cycle):
+		super(RoadsCell, self).__init__(road_network, hi_cycle, lo_cycle)
 		
 		self.__choose_control_parameters()
 		
@@ -167,7 +182,8 @@ class RoadsCell(Cell):
 	def __select_starting_points(self, n):	
 		# N longest cycle edges
 		edge_len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
-		longest_edges = sorted(self.cycle, key=lambda e: -edge_len(*e))
+		hi_cycle_edges = list(self.hi_cycle_edges())
+		longest_edges = sorted(hi_cycle_edges, key=lambda e: -edge_len(*e))
 
 		points = []
 		for a, b in longest_edges[:n]:
@@ -307,11 +323,11 @@ class RoadsCell(Cell):
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
 		snap_size_sq = self.snap_size**2
 
-		for cycle_edge in self.cycle:
+		for cycle_edge in self.hi_cycle_edges():
 			u = vec(cycle_edge[0], cycle_edge[1])
 			v = vec(cycle_edge[0], b)
 			cross_z = u[0]*v[1] - u[1]*v[0];
-			if (cross_z > 0) or (util.line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
+			if (cross_z < 0) or (util.line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
 				if join:
 					road = self.road_network.road_for_edge(*cycle_edge)
 					dist = lambda p: (p[0] - a[0])**2 + (p[1] - a[1])**2
@@ -334,7 +350,6 @@ class RoadsCell(Cell):
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
 		curve_obj.parent = parent
 
-			
 		road = assets.load_object('secondary_road')
 		road.name = name
 		road.parent = parent
@@ -357,10 +372,10 @@ class RoadsCell(Cell):
 
 	def full_graph(self):
 		"""Graph combining secondary roads and surrounding primary road cycle."""
-		cycle_graph = nx.Graph()
-		for edge in self.cycle:
-			cycle_graph.add_edge(*edge)
-		return nx.compose(self.graph, cycle_graph)
+		graph = self.graph.copy()
+		for edge in self.lo_cycle_edges():
+			graph.add_edge(*edge)
+		return graph
 	
 	
 	def create_blender_object(self, root):
@@ -376,17 +391,48 @@ class RoadsCell(Cell):
 		return parent
 
 
-class BuildingsCell(RoadsCell):
-	"""Roads city cell with buildings."""
-	def __init__(self, road_network, cycle):
-		super(BuildingsCell, self).__init__(road_network, cycle)
+class BlocksCell(RoadsCell):
+	"""Roads city cell with city blocks containing buildings."""
+	blocks = None # List of CityBlock objects
+	
+	def __init__(self, road_network, hi_cycle, lo_cycle):
+		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle)
+	
+	def __create_blender_block_outline(self, block, root):
+		curve = bpy.data.curves.new(name='cycle', type='CURVE')
+		curve.dimensions = '3D'
+		
+		polyline = curve.splines.new('POLY')
+		polyline.points.add(len(block))
+		i = 0
+		el = random.randint(1, 10) * 10
+		for p in block:
+			polyline.points[i].co = (p[0], p[1], self.terrain.height_at(*p) + el, 1.0)
+			i += 1
+		polyline.points[i].co = (block[0][0], block[0][1], self.terrain.height_at(*block[0]) + el, 1.0)
+		
+		
+		curve_obj = bpy.data.objects.new('cycle_curv', curve)
+		curve_obj.parent = root
+		
+		bpy.context.scene.objects.link(curve_obj)
+		
 	
 	def __generate_blocks(self):
 		full_graph = self.full_graph()
-		self.blocks = mcb.planar_graph_cycles(full_graph)
+		self.block_cycles = mcb.planar_graph_cycles(full_graph)
+
+		self.blocks = []
+		for cycle in self.block_cycles:
+			blk = block.CityBlock(cycle)
+			self.blocks.append(blk)
 	
 	def generate(self):
-		super(BuildingsCell, self).generate()
+		super(BlocksCell, self).generate()
 	
 		self.__generate_blocks()
+		
+
+	def create_blender_object(self, root):
+		super(BlocksCell, self).create_blender_object(root)
 		
