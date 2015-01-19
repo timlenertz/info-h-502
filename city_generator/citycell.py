@@ -139,8 +139,18 @@ class RoadsCell(Cell):
 	med_cycle = None # Primary road cycle, hi level + intersections with secondary roads
 	# The last point in a road is never marked, but only the first one of the next road (= same point)
 
+	segment_size = None
+	snap_size = None
+	degree = None
+	span_angle = None
+	angle_deviation = None
+	join_probability = None
+	lot_area_range = None
+	building_height_range = None
+
+
 	"""City cell which contains secondary roads."""
-	def __init__(self, road_network, hi_cycle, lo_cycle):
+	def __init__(self, road_network, hi_cycle, lo_cycle, profile='URBAN'):
 		super(RoadsCell, self).__init__(road_network, hi_cycle, lo_cycle)
 		
 		self.__choose_control_parameters('SUBURBAN')
@@ -236,13 +246,23 @@ class RoadsCell(Cell):
 			self.span_angle = 3.0*np.pi/2.0
 			self.angle_deviation = 0.0
 			self.join_probability = 1.0
+
 		elif profile == 'SUBURBAN':
-			self.segment_size = 40.0
-			self.snap_size = 30.0
+			self.segment_size = 30.0
+			self.snap_size = 20.0
 			self.degree = 2
 			self.span_angle = 1.2*np.pi
 			self.angle_deviation = 0.5
 			self.join_probability = 0.4
+			
+		elif profile == 'RURAL':
+			self.segment_size = 50.0
+			self.snap_size = 30.0
+			self.degree = 2
+			self.span_angle = 0.8*np.pi
+			self.angle_deviation = 0.5
+			self.join_probability = 0.2
+			# TODO add lot/building params
 
 		
 		

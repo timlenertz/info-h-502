@@ -188,6 +188,9 @@ class CityBlock(object):
 			self.__make_lots()
 	
 	def create_blender_object(self, root):
+		if not self.valid:
+			return
+			
 		parent = bpy.data.objects.new('block', None)
 		parent.parent = root
 		bpy.context.scene.objects.link(parent)
