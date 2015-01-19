@@ -21,8 +21,9 @@ if 'bpy' in locals():
 	imp.reload(util)
 	imp.reload(mcb)
 	imp.reload(block)
+	imp.reload(blocklot)
 else:
-	from . import city, plan, terrain, assets, citycell, util, mcb, block
+	from . import city, plan, terrain, assets, citycell, util, mcb, block, blocklot
 	import bpy
 
 

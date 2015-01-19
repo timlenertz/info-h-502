@@ -90,8 +90,9 @@ def extract_filament(graph, v0, v1, heap, primitives):
 		
 		primitive.vertices.append(v0)
 		if num_adjacent(graph, v0) == 0:
-			heap.remove(v0)
-			graph.remove_node(v0)
+			if v0 in heap:
+				heap.remove(v0)
+				graph.remove_node(v0)
 
 		primitives.append(primitive)
 
@@ -185,9 +186,7 @@ def extract_primitive(graph, v0, heap, primitives):
 	v1 = get_clockwise_most(graph, None, v0)
 	vprev = v0
 	vcurr = v1
-	
-	print(v0, v1)
-	
+		
 	while (vcurr != None) and (vcurr != v0) and (vcurr not in visited):
 		sequence.append(vcurr)
 		visited.add(vcurr)

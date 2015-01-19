@@ -7,20 +7,15 @@ import networkx as nx
 from . import assets, util, mcb, block
 
 class Cell(object):
-	hi_cycle = None # High-level cycle of enclosing primary roads
-	lo_cycle = None # Low-level cycle of enclosing primary roads
+	hi_cycle = None # High-level cycle of enclosing primary roads: Intersections of primary roads only
+	lo_cycle = None # Low-level cycle of enclosing primary roads: Indiv segments constituing primary road trajectory.
 	# Both as list of vertices in clockwise order
 
 	"""City cell enclosed by primary road cycle."""
 	def __init__(self, road_network, hi_cycle, lo_cycle):
-		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
-
-		u = vec(hi_cycle[0], hi_cycle[1])
-		v = vec(hi_cycle[1], hi_cycle[2])
-		cross_z = u[0]*v[1] - u[1]*v[0];
-		if cross_z < 0:
+		if not util.polygon_is_clockwise(hi_cycle):
 			hi_cycle.reverse()
-			lo_cycle.reverse()
+			lo_cycle.reverse()	
 
 		self.hi_cycle = hi_cycle
 		self.lo_cycle = lo_cycle
@@ -141,28 +136,42 @@ class LakeCell(Cell):
 
 
 class RoadsCell(Cell):
+	med_cycle = None # Primary road cycle, hi level + intersections with secondary roads
+	# The last point in a road is never marked, but only the first one of the next road (= same point)
+
 	"""City cell which contains secondary roads."""
 	def __init__(self, road_network, hi_cycle, lo_cycle):
 		super(RoadsCell, self).__init__(road_network, hi_cycle, lo_cycle)
 		
-		self.__choose_control_parameters()
-		
+		self.__choose_control_parameters('SUBURBAN')
 	
 	def generate(self):
 		self.graph = nx.Graph()
-	
+		
+		# __in_med_cycle: list of lists of bools.
+		# __in_med_cycle[i][j] indicates if point j of road i is included in med cycle graph
+		self.__in_med_cycle = dict()
+		for a, b in util.cycle_pairs(self.hi_cycle):
+			key = frozenset([a, b])
+			road = self.road_network.road_for_edge(a, b)
+			road_m = np.zeros(len(road), dtype=bool)
+			road_m[0] = True
+			self.__in_med_cycle[key] = road_m
+		
+		# Initially include
 		starting_points = self.__select_starting_points(2)
 		extremities = []
 		for s, edge in starting_points:
 			a, b = edge
 			ab = (b[0] - a[0], b[1] - a[1])
-			ap = (-ab[1], ab[0])
+			ap = (ab[1], -ab[0])
 			len_ap = math.sqrt(ap[0]**2 + ap[1]**2)
 			ap = (self.segment_size * ap[0] / len_ap, self.segment_size * ap[1] / len_ap)
 			p = (s[0] + ap[0], s[1] + ap[1])
 			self.graph.add_edge(s, p)
 			extremities.append(p)
 		
+		# Grow secondary roads
 		grow = True
 		i = 0
 		max_iterations = 15
@@ -178,6 +187,21 @@ class RoadsCell(Cell):
 			i = i + 1
 			if i > max_iterations:
 				grow = False	
+
+		# Make med cycle
+		self.med_cycle = []
+		for a, b in util.cycle_pairs(self.hi_cycle):
+			road = self.road_network.oriented_road_for_edge(a, b)
+			key = frozenset([a, b])
+			road_m = self.__in_med_cycle[key]
+			for i, p in enumerate(road):
+				if road_m[i]:
+					self.med_cycle.append(p)
+
+
+	def __mark_in_med_cycle(self, road_a, road_b, i):
+		key = frozenset([road_a, road_b])
+		self.__in_med_cycle[key][i] = True
 
 	def __select_starting_points(self, n):	
 		# N longest cycle edges
@@ -195,19 +219,31 @@ class RoadsCell(Cell):
 			r = min(max(r, 0.0), 0.95)
 			n = len(road) - 1
 			i = math.floor(n * r)
-			a, b = road[i], road[i+1]
+			
+			self.__mark_in_med_cycle(a, b, i)
 				
-			edge = (a, b)
-			points.append((a, edge))
+			edge = (road[i], road[i+1])
+			points.append((road[i], edge))
 		
 		return points
 	
 	
-	def __choose_control_parameters(self):
-		self.segment_size = 30.0
-		self.snap_size = 20.0
-		self.degree = 3
-		self.join_probability = 0.4
+	def __choose_control_parameters(self, profile):
+		if profile == 'URBAN':
+			self.segment_size = 30.0
+			self.snap_size = 20.0
+			self.degree = 3
+			self.span_angle = 3.0*np.pi/2.0
+			self.angle_deviation = 0.0
+			self.join_probability = 1.0
+		elif profile == 'SUBURBAN':
+			self.segment_size = 40.0
+			self.snap_size = 30.0
+			self.degree = 2
+			self.span_angle = 1.2*np.pi
+			self.angle_deviation = 0.5
+			self.join_probability = 0.4
+
 		
 		
 	def __grow_from(self, pt):
@@ -218,17 +254,17 @@ class RoadsCell(Cell):
 			prev = p
 			break
 		
-		region_per_branch = np.pi / self.degree
+		region_per_branch = self.span_angle / self.degree
 		for i in range(self.degree):
 			mn = region_per_branch * i
 			mx = mn + region_per_branch
 			
-			r = random.normalvariate(0.5, 0.4)
+			r = random.normalvariate(0.5, self.angle_deviation)
 			r = min(max(r, 0.0), 1.0)
 			
 			rel_angle = mn + r * (mx - mn)
 			edge_angle = np.arctan2(pt[1] - prev[1], pt[0] - prev[0])
-			angle = edge_angle - np.pi/2 + rel_angle
+			angle = edge_angle - self.span_angle/2 + rel_angle
 			dx = self.segment_size * np.cos(angle)
 			dy = self.segment_size * np.sin(angle)
 			new_pt = (pt[0] + dx, pt[1] + dy)
@@ -327,16 +363,20 @@ class RoadsCell(Cell):
 			u = vec(cycle_edge[0], cycle_edge[1])
 			v = vec(cycle_edge[0], b)
 			cross_z = u[0]*v[1] - u[1]*v[0];
-			if (cross_z < 0) or (util.line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
+			if (cross_z > 0) or (util.line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
 				if join:
-					road = self.road_network.road_for_edge(*cycle_edge)
-					dist = lambda p: (p[0] - a[0])**2 + (p[1] - a[1])**2
-					p = min(road, key=dist)
-					self.graph.add_edge(a, p)
+					road = self.road_network.oriented_road_for_edge(*cycle_edge)
+					def dist(i):
+						p = road[i]
+						return (p[0] - a[0])**2 + (p[1] - a[1])**2
+						
+					i = min(range(len(road)), key=dist)
+					self.graph.add_edge(a, road[i])
+					self.__mark_in_med_cycle(cycle_edge[0], cycle_edge[1], i)
+					
 				return False
 		return True
-	
-		
+			
 	def __create_blender_road(self, name, parent, edge):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
@@ -373,7 +413,7 @@ class RoadsCell(Cell):
 	def full_graph(self):
 		"""Graph combining secondary roads and surrounding primary road cycle."""
 		graph = self.graph.copy()
-		for edge in self.lo_cycle_edges():
+		for edge in util.cycle_pairs(self.med_cycle):
 			graph.add_edge(*edge)
 		return graph
 	
@@ -396,27 +436,7 @@ class BlocksCell(RoadsCell):
 	blocks = None # List of CityBlock objects
 	
 	def __init__(self, road_network, hi_cycle, lo_cycle):
-		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle)
-	
-	def __create_blender_block_outline(self, block, root):
-		curve = bpy.data.curves.new(name='cycle', type='CURVE')
-		curve.dimensions = '3D'
-		
-		polyline = curve.splines.new('POLY')
-		polyline.points.add(len(block))
-		i = 0
-		el = random.randint(1, 10) * 10
-		for p in block:
-			polyline.points[i].co = (p[0], p[1], self.terrain.height_at(*p) + el, 1.0)
-			i += 1
-		polyline.points[i].co = (block[0][0], block[0][1], self.terrain.height_at(*block[0]) + el, 1.0)
-		
-		
-		curve_obj = bpy.data.objects.new('cycle_curv', curve)
-		curve_obj.parent = root
-		
-		bpy.context.scene.objects.link(curve_obj)
-		
+		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle)		
 	
 	def __generate_blocks(self):
 		full_graph = self.full_graph()
@@ -424,7 +444,8 @@ class BlocksCell(RoadsCell):
 
 		self.blocks = []
 		for cycle in self.block_cycles:
-			blk = block.CityBlock(cycle)
+			blk = block.CityBlock(self, cycle)
+			blk.generate()
 			self.blocks.append(blk)
 	
 	def generate(self):
@@ -436,3 +457,9 @@ class BlocksCell(RoadsCell):
 	def create_blender_object(self, root):
 		super(BlocksCell, self).create_blender_object(root)
 		
+		parent = bpy.data.objects.new('blocks', None)
+		parent.parent = root
+		bpy.context.scene.objects.link(parent)
+		
+		for block in self.blocks:
+			block.create_blender_object(parent)

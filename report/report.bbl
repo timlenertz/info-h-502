@@ -1,0 +1,17 @@
+\begin{thebibliography}{}
+
+\bibitem[\protect\citename{Eberly, }2005]{Eber2005}
+Eberly, David. 2005 (November).
+\newblock {\em The Minimal Cycle Basis for a Planar Graph}.
+\newblock Tech. rept. Geometric Tools, LLC.
+
+\bibitem[\protect\citename{Kelly \& McCabe, }2007]{Kell2007}
+Kelly, George, \& McCabe, Hugh. 2007.
+\newblock Citygen: An Interactive System for Procedural City Generation.
+\newblock {\em GDTW 2007}.
+
+\bibitem[\protect\citename{Parish \& M{\"u}ller, }2001]{Pari2001}
+Parish, Yoav I~H, \& M{\"u}ller, Pascal. 2001.
+\newblock Procedural Modeling of Cities.
+
+\end{thebibliography}

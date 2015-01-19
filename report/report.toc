@@ -1,1 +1,10 @@
-\contentsline {chapter}{\numberline {1}Introduction}{3}{chapter.1}
+\contentsline {section}{\numberline {1}Introduction}{1}{section.1}
+\contentsline {section}{\numberline {2}Methodology}{1}{section.2}
+\contentsline {subsection}{\numberline {2.1}Terrain}{2}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Primary Streets}{2}{subsection.2.2}
+\contentsline {subsection}{\numberline {2.3}City Cells}{2}{subsection.2.3}
+\contentsline {subsection}{\numberline {2.4}Secondary Roads}{2}{subsection.2.4}
+\contentsline {subsection}{\numberline {2.5}Blocks}{2}{subsection.2.5}
+\contentsline {subsection}{\numberline {2.6}Buildings}{2}{subsection.2.6}
+\contentsline {section}{\numberline {3}Implementation}{2}{section.3}
+\contentsline {section}{\numberline {4}Results}{2}{section.4}

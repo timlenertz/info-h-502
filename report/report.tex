@@ -1,4 +1,4 @@
-\documentclass[a4paper,11pt]{scrreprt}
+\documentclass[a4paper,12pt]{scrartcl}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{mathtools}
@@ -17,15 +17,51 @@
 \begin{document}
 
 \titlehead{Université Libre de Bruxelles}
-\title{Procedural City Generator Project Report}
+\title{Procedural City Generator Project}
 \subtitle{INFO-H-502 - Image synthesis}
-\author{Tim Lenertz / Rhenzi Deng}
+\author{Tim Lenertz}
 \date{\today}
 \maketitle
 
-\tableofcontents
+\section{Introduction}
+The goal of this project is to develop a Blender add-on that generates a randomized city model. The city consists of a street layout, different kinds of buildings, lakes, gardens and parcs. All of these elements should be randomized as well.
 
-\chapter{Introduction}
+\section{Methodology}
+In order to generate a credible model of a random city, a logical approach is to emulate the way a city evolves in reality: Streets are shaped according to the shape of the terrain, and in relation to previously existing infrastructure. Also the most developped part tends to be located near a city center, while more remote areas remain more rural.
+
+This project is based on the \emph{Citygen} system described in \cite{Kell2007}. The city model is generated following these steps:
+\begin{enumerate}
+\item A terrain height-map is created featuring some erosion.
+\item Primary streets are put on the terrain, and made to connect some randomly defined intersection points. The streets' shape is guided by the terrain shape.
+\item The regions enclosed by primary streets are the \emph{city cells}. According to its distance from the center, each city cell is attributed a \emph{profile} that indicates whether this cell will contain a given type of city buildings and streets, or more rural content.
+\item For city cells that shall contain city buildings, a network of \emph{secondary roads} is created. Starting from two or more points on the enclosing primary street cycle, secondry roads are \emph{grown} into the city cell using a recursive algorithm that simulates the real evolution of a street layout.
+\item Each region enclosed by these secondary roads is called a \emph{block}. Each block is subdivided into \emph{lots}, and the lots placed next to a road will contain a building.
+\item For each of these lots, a certain kind of building is created with some randomization.
+\end{enumerate}
+The following text describes these 6 steps in more detail. The challenged encountered in implementing the algorithms are described in section \ref{sec:implementation}.
+
+\subsection{Terrain}
+
+\subsection{Primary Streets}
+
+\subsection{City Cells}
+
+\subsection{Secondary Roads}
+
+\subsection{Blocks}
+
+\subsection{Buildings}
+
+\section{Implementation}
+\label{sec:implementation}
+
+\section{Results}
+
+
+\bibliographystyle{authordate1}
+\nocite{*}
+\bibliography{../references/references.bib}
+
 
 
 \end{document}

@@ -190,7 +190,7 @@ class RoadNetwork(object):
 	
 	def __create_city_cell(self, cycle, remoteness):
 		road_cycle = self.road_cycle(cycle)
-		if remoteness < 0.3:
+		if remoteness < 0.3 or True:
 			return citycell.BlocksCell(self, cycle, road_cycle)
 		else:
 			return citycell.LakeCell(self, cycle, road_cycle)
@@ -200,7 +200,7 @@ class RoadNetwork(object):
 		
 		def add_road(a, b):
 			road = self.oriented_road_for_edge(a, b)
-			for p in road[:-2]:
+			for p in road[:-1]:
 				road_cyc.append(p)
 		
 		a = cycle[0]
