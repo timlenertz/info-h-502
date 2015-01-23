@@ -7,20 +7,22 @@ import networkx as nx
 from . import assets, util, mcb, block
 
 class Cell(object):
-	hi_cycle = None # High-level cycle of enclosing primary roads: Intersections of primary roads only
-	lo_cycle = None # Low-level cycle of enclosing primary roads: Indiv segments constituing primary road trajectory.
-	# Both as list of vertices in clockwise order
-
 	"""City cell enclosed by primary road cycle."""
-	def __init__(self, road_network, hi_cycle, lo_cycle):
+	
+	city = None
+	
+	# Cycles = The primary roads enclosing this city cell. Given as Polygon object.
+	hi_cycle = None # High level: straight edges between primary road intersections
+	lo_cycle = None # Low level: actual flow of primary roads instead of straight edges
+
+	def __init__(self, city, hi_cycle, lo_cycle):
 		if not util.polygon_is_clockwise(hi_cycle):
 			hi_cycle.reverse()
 			lo_cycle.reverse()	
 
 		self.hi_cycle = hi_cycle
 		self.lo_cycle = lo_cycle
-		self.road_network = road_network
-		self.terrain = self.road_network.terrain
+		self.city = city
 	
 	def bounding_box(self):
 		lo = (+np.inf, +np.inf)
@@ -150,10 +152,10 @@ class RoadsCell(Cell):
 
 
 	"""City cell which contains secondary roads."""
-	def __init__(self, road_network, hi_cycle, lo_cycle, profile='URBAN'):
+	def __init__(self, road_network, hi_cycle, lo_cycle, profile):
 		super(RoadsCell, self).__init__(road_network, hi_cycle, lo_cycle)
 		
-		self.__choose_control_parameters('SUBURBAN')
+		self.__choose_control_parameters(profile)
 	
 	def generate(self):
 		self.graph = nx.Graph()
@@ -246,6 +248,8 @@ class RoadsCell(Cell):
 			self.span_angle = 3.0*np.pi/2.0
 			self.angle_deviation = 0.0
 			self.join_probability = 1.0
+			self.lot_area_range = (100)
+			self.building_height_range = ()
 
 		elif profile == 'SUBURBAN':
 			self.segment_size = 30.0
@@ -455,8 +459,8 @@ class BlocksCell(RoadsCell):
 	"""Roads city cell with city blocks containing buildings."""
 	blocks = None # List of CityBlock objects
 	
-	def __init__(self, road_network, hi_cycle, lo_cycle):
-		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle)		
+	def __init__(self, road_network, hi_cycle, lo_cycle, profile='URBAN'):
+		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle, profile)		
 	
 	def __generate_blocks(self):
 		full_graph = self.full_graph()

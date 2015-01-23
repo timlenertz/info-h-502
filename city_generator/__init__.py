@@ -6,15 +6,12 @@ bl_info = {
 	'category' : "Object"	
 }
 
-__all__ = ['city', 'plan', 'terrain', 'assets']
-
 import imp
 import math
 
 if 'bpy' in locals():
 	import imp
 	imp.reload(city)
-	imp.reload(plan)
 	imp.reload(terrain)
 	imp.reload(assets)
 	imp.reload(citycell)
@@ -22,8 +19,9 @@ if 'bpy' in locals():
 	imp.reload(mcb)
 	imp.reload(block)
 	imp.reload(blocklot)
+	imp.reload(building)
 else:
-	from . import city, plan, terrain, assets, citycell, util, mcb, block, blocklot
+	from . import city, terrain, assets, citycell, util, mcb, block, blocklot, building
 	import bpy
 
 

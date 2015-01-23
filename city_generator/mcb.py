@@ -1,4 +1,4 @@
-# based on The Minimal Cycle Basis for a Planar Graph (David Eberly)
+# based on 'The Minimal Cycle Basis for a Planar Graph', David Eberly
 
 import networkx as nx
 import functools
@@ -239,7 +239,15 @@ def extract_primitives(graph, primitives):
 			extract_primitive(graph, vertex, heap, primitives)
 
 
+
 def planar_graph_cycles(graph):
+	"""Compute minimal cycle basis on graph embedding.
+	
+	graph is given as an undirected NetworkX Graph object. Nodes must be (float, float) tuples
+	giving X, Y coordinates. Returns list of cycles. Each cycle given as list of nodes.
+	Minimal cycle basis means all other cycles in the graph can be constructed by XORing a subset
+	of these cycles. For the city street graph these correspond to the regions enclosed by roads."""
+	
 	primitives = []
 	cycles = []
 	extract_primitives(graph, primitives)
