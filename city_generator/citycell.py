@@ -8,44 +8,21 @@ from . import assets, util, mcb, block
 
 class Cell(object):
 	"""City cell enclosed by primary road cycle."""
-	
 	city = None
+	terrain = None
 	
 	# Cycles = The primary roads enclosing this city cell. Given as Polygon object.
 	hi_cycle = None # High level: straight edges between primary road intersections
 	lo_cycle = None # Low level: actual flow of primary roads instead of straight edges
 
 	def __init__(self, city, hi_cycle, lo_cycle):
-		if not util.polygon_is_clockwise(hi_cycle):
-			hi_cycle.reverse()
-			lo_cycle.reverse()	
-
 		self.hi_cycle = hi_cycle
 		self.lo_cycle = lo_cycle
 		self.city = city
-	
-	def bounding_box(self):
-		lo = (+np.inf, +np.inf)
-		hi = (-np.inf, -np.inf)
-		for p in self.hi_cycle:
-			hi = (max(hi[0], p[0]), max(hi[1], p[1]))
-			lo = (min(lo[0], p[0]), min(lo[1], p[1]))
-		return (lo, hi)
-	
-	def hi_cycle_edges(self):
-		prev = self.hi_cycle[0]
-		for curr in self.hi_cycle[1:]:
-			yield (prev, curr)
-			prev = curr
-		yield (prev, self.hi_cycle[0])
-
-	def lo_cycle_edges(self):
-		prev = self.lo_cycle[0]
-		for curr in self.lo_cycle[1:]:
-			yield (prev, curr)
-			prev = curr
-		yield (prev, self.lo_cycle[0])
-
+		self.terrain = city.terrain
+		
+		self.hi_cycle.make_clockwise()
+		self.lo_cycle.make_clockwise()
 
 	def create_blender_object(self, root):
 		pass
@@ -56,51 +33,48 @@ class Cell(object):
 
 class LakeCell(Cell):
 	"""Cell containing lake. Embosses terrain and adds water surface."""
-	def __init__(self, road_network, hi_cycle, lo_cycle):
-		super(LakeCell, self).__init__(road_network, hi_cycle, lo_cycle)
+	def __init__(self, city, hi_cycle, lo_cycle):
+		super(LakeCell, self).__init__(city, hi_cycle, lo_cycle)
 	
-	def __emboss_terrain(self):
-		mn, mx = self.bounding_box()
+	def __emboss_terrain(self):		
+		cell_center = self.lo_cycle.center()
+		cell_center_to_boundary = self.lo_cycle.point_distance(cell_center)
 		
-		def dist_to_boundary(p):
-			dist = +np.inf
-			for edge in self.lo_cycle_edges():
-				d = util.line_to_point_dist(edge, p)
-				dist = min(dist, d)
-			return dist
-		
-		cell_center = ((mn[0] + mx[0])/2, (mn[1] + mx[1])/2)
-		cell_center_to_boundary = dist_to_boundary(cell_center)
-		max_dist = (mx[0] - mn[0]) + (mx[1] - mn[1])
-		
-		centers = []
+		# Randomly choose multiples basins for lake
+		# basin = (center point, radius, depth)
+		basins = []
 		num_centers = random.randint(1, 4)
 		for i in range(num_centers):
 			max_div = 0.3 * cell_center_to_boundary
 			dx = max_div * random.uniform(-1.0, 1.0)
 			dy = max_div * random.uniform(-1.0, 1.0)
 			center = (cell_center[0] + dx, cell_center[1] + dy)
-			centers.append( (center, dist_to_boundary(center)) )
+			
+			radius = self.lo_cycle.point_distance(center) * random.uniform(0.6, 1.0)
+			depth = radius * random.uniform(0.8, 1.3)
+			basins.append( (center, radius, depth ) )
 		
+		# Bounding box in pixel coordinates
+		mn, mx = self.lo_cycle.bounding_box()
 		mn = self.terrain.to_image(*mn)
 		mx = self.terrain.to_image(*mx)
 		
+		def emboss_for_basin_at_point(basin, p):
+			center, radius, depth = basin
+			dist = util.distance(p, center)
+			a = (dist * np.pi) / radius
+			return depth*((1.0 - math.cos(a))/2.0 - 1.0)
+		
+		# Iterate over these pixels to emboss terrain...
 		for im_x in range(mn[0], mx[0]):
 			for im_y in range(mn[1], mx[1]):
 				p = self.terrain.to_terrain(im_x, im_y)
 				
 				emboss = 0.0
-				for center, radius in centers:
-					dist = util.distance(center, p)
-					if dist < radius:
-						emboss += (radius - dist)**2 / radius**2
+				for basin in basins:
+					emboss -= emboss_for_basin_at_point(basin, p)
 				
-				noise = random.uniform(-1.0, 1.0)
-				amplitude = 0.0
-				if util.distance(p, cell_center) < cell_center_to_boundary:
-					amplitude = util.distance(p, cell_center) / cell_center_to_boundary
-				
-				self.terrain.image[im_y][im_x] -= 1.3*emboss + 0.3*amplitude*noise
+				self.terrain.image[im_y][im_x] -= emboss
 	
 
 	def create_blender_object(self, root):
@@ -126,10 +100,12 @@ class LakeCell(Cell):
 
 	
 	def generate(self):
+		# Emboss the terrain for the lake
 		self.__emboss_terrain()
 		
+		# Determine height of water surface
 		self.level = +np.inf
-		for p in self.lo_cycle:
+		for p in self.lo_cycle.vertices_iter():
 			height = self.terrain.height_at(*p)
 			if height < self.level:
 				self.level = height
@@ -138,8 +114,10 @@ class LakeCell(Cell):
 
 
 class RoadsCell(Cell):
+	"""City cell which contains secondary roads."""
+
 	med_cycle = None # Primary road cycle, hi level + intersections with secondary roads
-	# The last point in a road is never marked, but only the first one of the next road (= same point)
+	graph = None # Graph of secondary roads
 
 	segment_size = None
 	snap_size = None
@@ -147,46 +125,104 @@ class RoadsCell(Cell):
 	span_angle = None
 	angle_deviation = None
 	join_probability = None
-	lot_area_range = None
-	building_height_range = None
 
+	__in_med_cycle = None
 
-	"""City cell which contains secondary roads."""
-	def __init__(self, road_network, hi_cycle, lo_cycle, profile):
-		super(RoadsCell, self).__init__(road_network, hi_cycle, lo_cycle)
+	def __init__(self, city, hi_cycle, lo_cycle, profile):
+		super(RoadsCell, self).__init__(city, hi_cycle, lo_cycle)
 		
-		self.__choose_control_parameters(profile)
-	
+		if profile == 'URBAN':
+			self.segment_size = 30.0
+			self.snap_size = 20.0
+			self.degree = 3
+			self.span_angle = 3.0*np.pi/2.0
+			self.angle_deviation = 0.0
+			self.join_probability = 1.0
+		elif profile == 'SUBURBAN':
+			self.segment_size = 30.0
+			self.snap_size = 20.0
+			self.degree = 2
+			self.span_angle = 1.2*np.pi
+			self.angle_deviation = 0.5
+			self.join_probability = 0.4	
+		elif profile == 'RURAL':
+			self.segment_size = 50.0
+			self.snap_size = 30.0
+			self.degree = 2
+			self.span_angle = 0.8*np.pi
+			self.angle_deviation = 0.5
+			self.join_probability = 0.2
+		else:
+			raise Exception("Invalid city cell profile.")
+
+	def __is_in_med_cycle(self, a, b, i):
+		road = self.road_network.road_for_edge(a, b)
+		key = (a, b)
+		return self.__in_med_cycle[(a, b)][i] \
+			or self.__in_med_cycle[(b, a)][len(road) - i - 1]
+
+	def __mark_in_med_cycle(self, a, b, i):
+		key = frozenset([a, b])
+		if key not in self.__in_med_cycle:
+			road = self.road_network.road_for_edge(a, b)
+			self.__in_med_cycle[(a, b)] = np.zeros(len(road), dtype=bool)
+		self.__in_med_cycle[(a, b)][i] = True
+		
+
+	def __select_starting_junctions(self, n):
+		"""Select n points on primary road cycle from where the secondary roads should grow inwards."""
+		# N longest cycle edges
+		hi_cycle_edges = list(self.hi_cycle.edges_iter())
+		longest_edges = sorted(hi_cycle_edges, key=lambda e: -util.distance_sq(*e))
+
+		junctions = [] # junction = (point from low level cycle, next point)
+		# Next point is included in order to compute perpendicular segment
+		
+		for a, b in longest_edges[:n]:
+			# Get low level road path for that edge	
+			road = self.city.oriented_road_for_edge(a, b)		
+			
+			# Deviated middle segment
+			r = random.normalvariate(0.5, 0.2)
+			road_n = len(road) - 1
+			i = math.floor(road_n * r)
+			i = min(max((i, 0), road_n - 1)
+			
+			self.__mark_in_med_cycle(a, b, i)
+				
+			junction = (road[i], road[i+1]);
+			junctions.append(junction)
+		
+		return junctions
+
+
 	def generate(self):
 		self.graph = nx.Graph()
 		
 		# __in_med_cycle: list of lists of bools.
 		# __in_med_cycle[i][j] indicates if point j of road i is included in med cycle graph
+		# Initially include start point for each road (--> high-level graph intersection points)
 		self.__in_med_cycle = dict()
-		for a, b in util.cycle_pairs(self.hi_cycle):
-			key = frozenset([a, b])
-			road = self.road_network.road_for_edge(a, b)
-			road_m = np.zeros(len(road), dtype=bool)
-			road_m[0] = True
-			self.__in_med_cycle[key] = road_m
+		for a, b in self.hi_cycle.edges_iter():
+			__mark_in_med_cycle(a, b, 0)
 		
-		# Initially include
-		starting_points = self.__select_starting_points(2)
+		# Select starting points and grow in first segments
+		starting_points = self.__select_starting_junctions(2)
 		extremities = []
-		for s, edge in starting_points:
+		for edge in starting_points:
 			a, b = edge
 			ab = (b[0] - a[0], b[1] - a[1])
 			ap = (ab[1], -ab[0])
 			len_ap = math.sqrt(ap[0]**2 + ap[1]**2)
 			ap = (self.segment_size * ap[0] / len_ap, self.segment_size * ap[1] / len_ap)
 			p = (s[0] + ap[0], s[1] + ap[1])
-			self.graph.add_edge(s, p)
+			self.graph.add_edge(a, b)
 			extremities.append(p)
 		
 		# Grow secondary roads
 		grow = True
 		i = 0
-		max_iterations = 15
+		max_iterations = 30
 		while grow:
 			grow = False
 			new_extremities = []
@@ -196,81 +232,22 @@ class RoadsCell(Cell):
 					grow = True
 					new_extremities = new_extremities + add_extremities
 			extremities = new_extremities
-			i = i + 1
+			i += 1
 			if i > max_iterations:
 				grow = False	
 
 		# Make med cycle
-		self.med_cycle = []
-		for a, b in util.cycle_pairs(self.hi_cycle):
+		med_cycle = []
+		for a, b in self.hi_graph.edges_iter():
 			road = self.road_network.oriented_road_for_edge(a, b)
-			key = frozenset([a, b])
-			road_m = self.__in_med_cycle[key]
-			for i, p in enumerate(road):
-				if road_m[i]:
-					self.med_cycle.append(p)
-
-
-	def __mark_in_med_cycle(self, road_a, road_b, i):
-		key = frozenset([road_a, road_b])
-		self.__in_med_cycle[key][i] = True
-
-	def __select_starting_points(self, n):	
-		# N longest cycle edges
-		edge_len = lambda a, b: (a[0] - b[0])**2 + (a[1] - b[1])**2
-		hi_cycle_edges = list(self.hi_cycle_edges())
-		longest_edges = sorted(hi_cycle_edges, key=lambda e: -edge_len(*e))
-
-		points = []
-		for a, b in longest_edges[:n]:
-			# Get low level road path for that edge	
-			road = self.road_network.oriented_road_for_edge(a, b)		
-			
-			# Deviated middle segment
-			r = random.normalvariate(0.5, 0.2)
-			r = min(max(r, 0.0), 0.95)
-			n = len(road) - 1
-			i = math.floor(n * r)
-			
-			self.__mark_in_med_cycle(a, b, i)
-				
-			edge = (road[i], road[i+1])
-			points.append((road[i], edge))
-		
-		return points
-	
-	
-	def __choose_control_parameters(self, profile):
-		if profile == 'URBAN':
-			self.segment_size = 30.0
-			self.snap_size = 20.0
-			self.degree = 3
-			self.span_angle = 3.0*np.pi/2.0
-			self.angle_deviation = 0.0
-			self.join_probability = 1.0
-			self.lot_area_range = (100)
-			self.building_height_range = ()
-
-		elif profile == 'SUBURBAN':
-			self.segment_size = 30.0
-			self.snap_size = 20.0
-			self.degree = 2
-			self.span_angle = 1.2*np.pi
-			self.angle_deviation = 0.5
-			self.join_probability = 0.4
-			
-		elif profile == 'RURAL':
-			self.segment_size = 50.0
-			self.snap_size = 30.0
-			self.degree = 2
-			self.span_angle = 0.8*np.pi
-			self.angle_deviation = 0.5
-			self.join_probability = 0.2
-			# TODO add lot/building params
-
+			for i in range(len(road)):
+				if self.__is_in_med_cycle(a, b, i):
+					med_cycle.append(road[i])
+		self.med_cycle = Polygon(med_cycle)
 		
 		
 	def __grow_from(self, pt):
+		"""Grow secondary roads from given extremity point."""
 		new_extremities = []
 	
 		prev = None
@@ -301,7 +278,13 @@ class RoadsCell(Cell):
 		
 		return new_extremities
 	
+	
 	def __snap(self, new_edge, join):
+		"""Span algorithm.
+		
+		Returns True if the proposed new edge should be added. If not it should be rejected.
+		If join is set, the algorithm adds a connecting segment to previously existing roads
+		before returning False."""
 		if not self.__inside_cycle_test(new_edge, join):
 			return True
 		elif not self.__edge_intersection_test(new_edge, join):
@@ -331,7 +314,7 @@ class RoadsCell(Cell):
 			if r < 0.0:
 				continue
 			elif r < 1.0:
-				dist_sq = util.line_to_point_dist_sq(new_edge, c)
+				dist_sq = util.line_to_point_distance_sq(new_edge, c)
 			else:
 				dist_sq = (b[0] - c[0])**2 + (b[1] - c[1])**2
 				
@@ -350,10 +333,10 @@ class RoadsCell(Cell):
 		for edge in self.graph.edges_iter():
 			if not util.projection_is_on_segment(edge, b):
 				break
-			dist_sq = util.line_to_point_dist_sq(edge, b)	
+			dist_sq = util.line_to_point_distance_sq(edge, b)	
 			if dist_sq < snap_size_sq:
 				if join and (a != edge[0]) and (a != edge[1]):
-					proj = util.project_on_segment(edge, b)
+					proj = util.project_on_line(edge, b)
 					c, d = edge
 					self.graph.remove_edge(c, d)
 					self.graph.add_edge(c, proj)
@@ -387,7 +370,7 @@ class RoadsCell(Cell):
 			u = vec(cycle_edge[0], cycle_edge[1])
 			v = vec(cycle_edge[0], b)
 			cross_z = u[0]*v[1] - u[1]*v[0];
-			if (cross_z > 0) or (util.line_to_point_dist_sq(cycle_edge, b) < snap_size_sq):
+			if (cross_z > 0) or (util.line_to_point_distance_sq(cycle_edge, b) < snap_size_sq):
 				if join:
 					road = self.road_network.oriented_road_for_edge(*cycle_edge)
 					def dist(i):
@@ -400,7 +383,23 @@ class RoadsCell(Cell):
 					
 				return False
 		return True
-			
+	
+
+	def full_graph_med(self):
+		"""Graph combining secondary roads and surrounding primary road cycle."""
+		graph = self.graph.copy()
+		for edge in self.med_cycle.edges_iter():
+			graph.add_edge(*edge)
+		return graph
+		
+	def full_graph_low(self):
+		"""Graph combining secondary roads and surrounding primary road cycle, including shape of primary roads."""
+		graph = self.graph.copy()
+		for edge in self.lo_cycle.edges_iter():
+			graph.add_edge(*edge)
+		return graph
+
+
 	def __create_blender_road(self, name, parent, edge):
 		curve = bpy.data.curves.new(name=name, type='CURVE')
 		curve.dimensions = '3D'
@@ -408,10 +407,10 @@ class RoadsCell(Cell):
 		a, b = edge
 		polyline = curve.splines.new('POLY')
 		polyline.points.add(1)
-		polyline.points[0].co = (a[0], a[1], self.terrain.height_at(*a), 1.0)
-		polyline.points[1].co = (b[0], b[1], self.terrain.height_at(*b), 1.0)
+		polyline.points[0].co = (a[0], a[1], self.terrain.elevation_at(*a), 1.0)
+		polyline.points[1].co = (b[0], b[1], self.terrain.elevation_at(*b), 1.0)
 		
-		curve_obj = bpy.data.objects.new(name + "_curve", curve)
+		curve_obj = bpy.data.objects.new(name + '_curve', curve)
 		curve_obj.parent = parent
 
 		road = assets.load_object('secondary_road')
@@ -420,6 +419,10 @@ class RoadsCell(Cell):
 		
 		length = util.distance(*edge)
 		segment_length = road.dimensions.x
+
+		extra_length = segment_length * 1.5
+		length += extra_length
+		road.location[0] = -extra_length / 2.0
 
 		scale = length / segment_length
 		road.scale[0] = scale
@@ -433,14 +436,6 @@ class RoadsCell(Cell):
 		
 		return road
 
-
-	def full_graph(self):
-		"""Graph combining secondary roads and surrounding primary road cycle."""
-		graph = self.graph.copy()
-		for edge in util.cycle_pairs(self.med_cycle):
-			graph.add_edge(*edge)
-		return graph
-	
 	
 	def create_blender_object(self, root):
 		parent = bpy.data.objects.new('secondary_roads', None)
@@ -450,7 +445,7 @@ class RoadsCell(Cell):
 		i = 0
 		for edge in self.graph.edges_iter():
 			self.__create_blender_road('secondary_road_'+str(i), parent, edge)
-			i = i + 1
+			i += 1
 		
 		return parent
 
@@ -459,23 +454,36 @@ class BlocksCell(RoadsCell):
 	"""Roads city cell with city blocks containing buildings."""
 	blocks = None # List of CityBlock objects
 	
-	def __init__(self, road_network, hi_cycle, lo_cycle, profile='URBAN'):
-		super(BlocksCell, self).__init__(road_network, hi_cycle, lo_cycle, profile)		
+	lot_area_range = None
+	building_types = None
 	
-	def __generate_blocks(self):
-		full_graph = self.full_graph()
-		self.block_cycles = mcb.planar_graph_cycles(full_graph)
+	def __init__(self, city, hi_cycle, lo_cycle):
+		super(BlocksCell, self).__init__(city, hi_cycle, lo_cycle, profile)		
+	
+		if profile == 'URBAN':
+			self.lot_area_range = (80, 200)
+			self.building_types = ['Skyscraper']
+		elif profile == 'SUBURBAN':
+			self.lot_area_range = (100, 150)
+			self.building_types = ['Skyscraper']
+		elif profile == 'RURAL':
+			self.lot_area_range = (100, 200)
+			self.building_types = ['Skyscraper']
 
-		self.blocks = []
-		for cycle in self.block_cycles:
-			blk = block.CityBlock(self, cycle)
-			blk.generate()
-			self.blocks.append(blk)
-	
+
 	def generate(self):
 		super(BlocksCell, self).generate()
 	
-		self.__generate_blocks()
+		# Blocks = areas enclosed by road graph
+		full_graph = self.full_graph_med()
+		block_cycles = mcb.planar_graph_cycles(full_graph)
+
+		self.blocks = []
+		for cycle in block_cycles:
+			poly = Polygon(cycle)
+			blk = block.CityBlock(self, cycle)
+			blk.generate()
+			self.blocks.append(blk)
 		
 
 	def create_blender_object(self, root):

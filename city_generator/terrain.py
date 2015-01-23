@@ -3,7 +3,7 @@ import random
 import math
 import bpy
 
-from . import assets
+from . import assets, util
 
 class HeightMap(object):
 	"""Randomly generated height map.
@@ -63,6 +63,14 @@ class HeightMap(object):
 				self.__diamond((x, y), half, d)
 		
 		self.__subdivide(half, d / 2.0)
+	
+	
+	def flatten_segment(self, a, b):
+		pass
+	
+	
+	def flatten_polygon(self, poly):
+		pass
 		
 	
 	

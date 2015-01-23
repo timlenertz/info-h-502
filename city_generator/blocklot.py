@@ -9,10 +9,14 @@ from . import util
 class Lot(object):
 	def __init__(self, city_cell, cycle, outer_edges):
 		self.city_cell = city_cell
-		self.road_network = self.city_cell.road_network
-		self.terrain = self.road_network.terrain
+		self.city = self.city_cell.city
+		self.terrain = self.city.terrain
 		self.cycle = cycle
 		self.outer_edges = outer_edges
+		
+	
+	def generate(self):
+		pass
 	
 	def __create_skyscraper_mesh(self, height, name='skyscraper'):
 		n = len(self.cycle)
@@ -42,11 +46,6 @@ class Lot(object):
 		mesh.from_pydata(vertices, [], faces)
 		mesh.update(calc_edges=True)
 		return mesh, center
-
-		
-	
-	def generate(self):
-		pass
 	
 	def create_blender_object(self, parent):
 		height = random.uniform(10.0, 30.0)

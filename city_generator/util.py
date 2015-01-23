@@ -1,13 +1,14 @@
 import math
+import numpy as np
 
-def line_to_point_dist_sq(line, p):
+def line_to_point_distance_sq(line, p):
 	a, b = line
 	num = ( (b[1] - a[1])*p[0] - (b[0] - a[0])*p[1] + b[0]*a[1] - b[1]*a[0] )**2
 	den = (b[1] - a[1])**2 + (b[0] - a[0])**2
 	return num / den
 
-def line_to_point_dist(line, p):
-	return math.sqrt(line_to_point_dist_sq(line, p))
+def line_to_point_distance(line, p):
+	return math.sqrt(line_to_point_distance_sq(line, p))
 
 def distance_sq(a, b):
 	return (a[0] - b[0])**2 + (a[1] - b[1])**2
@@ -16,6 +17,7 @@ def distance(a, b):
 	return math.sqrt(distance_sq(a, b))
 	
 def projection_is_on_segment(seg, p, seg_length=None):
+	"""Check if point p projected on line seg is on the segment."""
 	if seg_length is None:
 		seg_length = distance(*seg)
 	a, b = seg
@@ -25,9 +27,10 @@ def projection_is_on_segment(seg, p, seg_length=None):
 	dot = ab[0]*ap[0] + ab[1]*ap[1]
 	return (dot > 0) and (dot < seg_length)
 
-def project_on_segment(seg, p):
-	a, b = seg
-	seg_length = distance(*seg)
+def project_on_line(l, p):
+	"""Return point p projected on line l (given by two points)."""
+	a, b = l
+	seg_length = distance(a, b)
 	ap = (p[0] - a[0], p[1] - a[1])
 	ab = (b[0] - a[0], b[1] - a[1])
 	ab = (ab[0] / seg_length, ab[1] / seg_length)
@@ -94,6 +97,9 @@ class Polygon:
 	
 	def __init__(self, vertices):
 		self.vertices = vertices
+	
+	def clone(self):
+		return Polygon(self.vertices[:])
 	
 	def number_of_vertices(self):
 		return len(self.vertices)
@@ -180,3 +186,19 @@ class Polygon:
 			y += pt[1]
 		n = len(self.vertices)
 		return (x / n, y / n)
+	
+	def bounding_box(self):
+		mn = self.vertices[0]
+		mx = self.vertices[0]
+		for p in self.vertices:
+			mn = (min(mn[0], p[0]), min(mn[1], p[1]))
+			mx = (max(mx[0], p[0]), max(mx[1], p[1]))
+		return (mn, mx)
+	
+	def point_distance(self, p):
+		min_dist_sq = +np.inf
+		for edge in self.edges_iter():
+			dist_sq = line_to_point_distance_sq(edge, p)
+			if dist_sq < min_dist_sq:
+				min_dist_sq = dist_sq
+		return math.sqrt(min_dist_sq)
