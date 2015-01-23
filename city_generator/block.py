@@ -143,7 +143,7 @@ class CityBlock(object):
 			self.valid = False
 			return
 		
-		self.contracted_cycle = cycle.clone()
+		self.contracted_cycle = self.cycle.clone()
 		self.contracted_cycle.contract(self.sidewalk_width)
 		
 		self.valid = self.contracted_cycle.is_simple() \

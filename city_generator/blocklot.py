@@ -19,18 +19,15 @@ class Lot(object):
 		pass
 	
 	def __create_skyscraper_mesh(self, height, name='skyscraper'):
-		n = len(self.cycle)
+		n = self.cycle.number_of_vertices()
 		vertices = [None]*(2*n)
 		faces = []
 		
-		center = (0.0, 0.0)
-		for x, y in self.cycle:
-			center = (center[0] + x, center[1] + y)
-		center = (center[0]/n, center[1]/n)
+		center = self.cycle.center()
 		
-		z = min([self.terrain.height_at(*p) for p in self.cycle])
+		z = min([self.terrain.elevation_at(*p) for p in self.cycle])
 		i = 0
-		for p in self.cycle:
+		for p in self.cycle.vertices_iter():
 			x, y = p
 			vertices[i] = (x - center[0], y - center[1], z)
 			vertices[i + n] = (x - center[0], y - center[1], z + height)

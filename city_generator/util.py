@@ -93,7 +93,7 @@ def cycle_pairs(items):
 
 class Polygon:
 	"""2D Polygon defined by list of vertices."""
-	vertices : None # List of (float, float) tuples for vertices of polygon.
+	vertices = None # List of (float, float) tuples for vertices of polygon.
 	
 	def __init__(self, vertices):
 		self.vertices = vertices
@@ -110,7 +110,22 @@ class Polygon:
 	
 	def edges_iter(self):
 		"""Iterator over edges. Edge = tuple of adjacent vertices. Includes last edge joining final with first vertex."""
-		return cycle_pairs(self)
+		return cycle_pairs(self.vertices)
+		
+	def __len__(self):
+		return len(self.vertices)
+	
+	def __getitem__(self, i):
+		return self.vertices[i]
+	
+	def __setitem__(self, i, v):
+		self.vertices[i] = v
+	
+	def __delitem__(self, i):
+		del self.vertices[i]
+	
+	def __iter__(self):
+		return self.vertices_iter()
 	
 	def contains_point(pt):
 		"""Check of pt is inside the polygon. pt is (float, float) tuple."""

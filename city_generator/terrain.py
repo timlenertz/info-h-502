@@ -97,14 +97,14 @@ class Terrain(HeightMap):
 	
 	def create_blender_mesh(self, name='terrain'):
 		"""Create blender mesh for the terrain."""
-		sl = self.side_length
+		sl = self.image_side_length
 		
 		# Vertex for each point on the image
 		vertices = []		
-		for y in range(0, sl):
-			vert_y = float(self.width * y) / sl
-			for x in range(0, sl):
-				vert_x = float(self.width * x) / sl
+		for y in range(0, self.image_side_length):
+			vert_y = y * self.pixel_side_length
+			for x in range(0, self.image_side_length):
+				vert_x = x * self.pixel_side_length
 				vert_z = self.height * self.image[y, x]
 				vert = (vert_x, vert_y, vert_z)
 				vertices.append(vert)
@@ -162,7 +162,7 @@ class Terrain(HeightMap):
 	
 	
 	def generate(self):
-		super(Terrain, self).__init__()
+		super(Terrain, self).generate()
 		self.pixel_side_length = self.side_length / self.image_side_length
 	
 	def to_image(self, x, y):

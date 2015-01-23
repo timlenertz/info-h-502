@@ -41,7 +41,7 @@ class City(object):
 
 
 	def __init__(self):
-		self.terrain = Terrain()
+		self.terrain = terrain.Terrain()
 		
 	
 	def __create_high_level_graph(self):
@@ -146,7 +146,7 @@ class City(object):
 		max_iterations = 1000
 		iterations = 0
 			
-		while dist(pos, dst) > self.road_snap_distance:			
+		while util.distance(pos, dst) > self.road_snap_distance:			
 			straight_angle = math.atan2(dst[1] - pos[1], dst[0] - pos[0])
 			min_angle = straight_angle - self.road_deviation_angle
 			angle_difference = (2.0*self.road_deviation_angle) / self.road_number_of_samples
@@ -331,7 +331,8 @@ class City(object):
 	def create_blender_object(self, name):
 		"""Create blender objects for the whole city.
 		
-		Must be called after generate(). Creates hiearchy of Blender objects, where root is given the provided name."""
+		Must be called after generate(). Creates hiearchy of Blender objects,
+		where root is given the provided name."""
 	
 		scene = bpy.context.scene
 						

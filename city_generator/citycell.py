@@ -156,7 +156,7 @@ class RoadsCell(Cell):
 			raise Exception("Invalid city cell profile.")
 
 	def __is_in_med_cycle(self, a, b, i):
-		road = self.road_network.road_for_edge(a, b)
+		road = self.city.road_for_edge(a, b)
 		key = (a, b)
 		return self.__in_med_cycle[(a, b)][i] \
 			or self.__in_med_cycle[(b, a)][len(road) - i - 1]
@@ -164,8 +164,9 @@ class RoadsCell(Cell):
 	def __mark_in_med_cycle(self, a, b, i):
 		key = frozenset([a, b])
 		if key not in self.__in_med_cycle:
-			road = self.road_network.road_for_edge(a, b)
+			road = self.city.road_for_edge(a, b)
 			self.__in_med_cycle[(a, b)] = np.zeros(len(road), dtype=bool)
+			self.__in_med_cycle[(b, a)] = np.zeros(len(road), dtype=bool)
 		self.__in_med_cycle[(a, b)][i] = True
 		
 
@@ -186,7 +187,7 @@ class RoadsCell(Cell):
 			r = random.normalvariate(0.5, 0.2)
 			road_n = len(road) - 1
 			i = math.floor(road_n * r)
-			i = min(max((i, 0), road_n - 1)
+			i = min(max(i, 0), road_n - 1)
 			
 			self.__mark_in_med_cycle(a, b, i)
 				
@@ -204,7 +205,7 @@ class RoadsCell(Cell):
 		# Initially include start point for each road (--> high-level graph intersection points)
 		self.__in_med_cycle = dict()
 		for a, b in self.hi_cycle.edges_iter():
-			__mark_in_med_cycle(a, b, 0)
+			self.__mark_in_med_cycle(a, b, 0)
 		
 		# Select starting points and grow in first segments
 		starting_points = self.__select_starting_junctions(2)
@@ -215,8 +216,8 @@ class RoadsCell(Cell):
 			ap = (ab[1], -ab[0])
 			len_ap = math.sqrt(ap[0]**2 + ap[1]**2)
 			ap = (self.segment_size * ap[0] / len_ap, self.segment_size * ap[1] / len_ap)
-			p = (s[0] + ap[0], s[1] + ap[1])
-			self.graph.add_edge(a, b)
+			p = (a[0] + ap[0], a[1] + ap[1])
+			self.graph.add_edge(a, p)
 			extremities.append(p)
 		
 		# Grow secondary roads
@@ -238,12 +239,12 @@ class RoadsCell(Cell):
 
 		# Make med cycle
 		med_cycle = []
-		for a, b in self.hi_graph.edges_iter():
-			road = self.road_network.oriented_road_for_edge(a, b)
+		for a, b in self.hi_cycle.edges_iter():
+			road = self.city.oriented_road_for_edge(a, b)
 			for i in range(len(road)):
 				if self.__is_in_med_cycle(a, b, i):
 					med_cycle.append(road[i])
-		self.med_cycle = Polygon(med_cycle)
+		self.med_cycle = util.Polygon(med_cycle)
 		
 		
 	def __grow_from(self, pt):
@@ -351,7 +352,7 @@ class RoadsCell(Cell):
 		for edge in self.graph.edges_iter():
 			if util.segment_intersection(edge, new_edge):
 				if join and (edge[0] not in nx.all_neighbors(self.graph, a)) and (edge[1] not in nx.all_neighbors(self.graph, a)):
-					proj = util.project_on_segment(edge, b)
+					proj = util.project_on_line(edge, b)
 					c, d = edge
 					self.graph.remove_edge(c, d)
 					self.graph.add_edge(c, proj)
@@ -366,13 +367,13 @@ class RoadsCell(Cell):
 		vec = lambda a, b: (b[0] - a[0], b[1] - a[1])
 		snap_size_sq = self.snap_size**2
 
-		for cycle_edge in self.hi_cycle_edges():
+		for cycle_edge in self.hi_cycle.edges_iter():
 			u = vec(cycle_edge[0], cycle_edge[1])
 			v = vec(cycle_edge[0], b)
 			cross_z = u[0]*v[1] - u[1]*v[0];
 			if (cross_z > 0) or (util.line_to_point_distance_sq(cycle_edge, b) < snap_size_sq):
 				if join:
-					road = self.road_network.oriented_road_for_edge(*cycle_edge)
+					road = self.city.oriented_road_for_edge(*cycle_edge)
 					def dist(i):
 						p = road[i]
 						return (p[0] - a[0])**2 + (p[1] - a[1])**2
@@ -457,7 +458,7 @@ class BlocksCell(RoadsCell):
 	lot_area_range = None
 	building_types = None
 	
-	def __init__(self, city, hi_cycle, lo_cycle):
+	def __init__(self, city, hi_cycle, lo_cycle, profile):
 		super(BlocksCell, self).__init__(city, hi_cycle, lo_cycle, profile)		
 	
 		if profile == 'URBAN':
@@ -480,8 +481,8 @@ class BlocksCell(RoadsCell):
 
 		self.blocks = []
 		for cycle in block_cycles:
-			poly = Polygon(cycle)
-			blk = block.CityBlock(self, cycle)
+			poly = util.Polygon(cycle)
+			blk = block.CityBlock(self, poly)
 			blk.generate()
 			self.blocks.append(blk)
 		
