@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013) (format=pdflatex 2014.6.1)  26 JAN 2015 11:40
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013) (format=pdflatex 2014.6.1)  26 JAN 2015 11:52
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -468,9 +468,9 @@ Package: verbatim 2003/08/22 v1.5q LaTeX2e package for verbatim enhancements
 Package: ifthen 2001/05/26 v1.1c Standard LaTeX ifthen package (DPC)
 )
 \verbatim@out=\write3
-runsystem(touch w18-test-2015126700.tex)...disabled (restricted).
+runsystem(touch w18-test-2015126712.tex)...disabled (restricted).
 
-runsystem(rm -f w18-test-2015126700.tex)...disabled (restricted).
+runsystem(rm -f w18-test-2015126712.tex)...disabled (restricted).
 
 
 
@@ -846,34 +846,17 @@ Package pdftex.def Info: sF.png used on input line 135.
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-./report.tex:154: Undefined control sequence.
-l.154 ...hree cell types are shown in figures \fig
-                                                  {fig:cellU}, \fig{fig:cell...
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
 
-./report.tex:154: Undefined control sequence.
-l.154 ...re shown in figures \fig{fig:cellU}, \fig
-                                                  {fig:cellS} and \fig{fig:c...
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
+Underfull \hbox (badness 10000) in paragraph at lines 140--155
 
-./report.tex:154: Undefined control sequence.
-l.154 ...\fig{fig:cellU}, \fig{fig:cellS} and \fig
-                                                  {fig:cellR}.
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
+ []
 
-<cellU.png, id=108, 561.09625pt x 466.74374pt>
+
+Underfull \hbox (badness 10000) in paragraph at lines 140--155
+
+ []
+
+<cellU.png, id=111, 561.09625pt x 466.74374pt>
 File: cellU.png Graphic file (type png)
  <use cellU.png>
 Package pdftex.def Info: cellU.png used on input line 158.
@@ -882,7 +865,7 @@ Package pdftex.def Info: cellU.png used on input line 158.
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-<cellS.png, id=109, 573.14125pt x 475.7775pt>
+<cellS.png, id=112, 573.14125pt x 475.7775pt>
 File: cellS.png Graphic file (type png)
  <use cellS.png>
 Package pdftex.def Info: cellS.png used on input line 165.
@@ -891,7 +874,7 @@ Package pdftex.def Info: cellS.png used on input line 165.
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-<cellR.png, id=110, 566.115pt x 475.7775pt>
+<cellR.png, id=113, 566.115pt x 475.7775pt>
 File: cellR.png Graphic file (type png)
  <use cellR.png>
 Package pdftex.def Info: cellR.png used on input line 172.
@@ -911,7 +894,7 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-[4] <alllots.png, id=120, 573.14125pt x 467.7475pt>
+[4] <alllots.png, id=126, 573.14125pt x 467.7475pt>
 File: alllots.png Graphic file (type png)
  <use alllots.png>
 Package pdftex.def Info: alllots.png used on input line 189.
@@ -920,7 +903,7 @@ Package pdftex.def Info: alllots.png used on input line 189.
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-<lots.png, id=122, 573.14125pt x 475.7775pt>
+<lots.png, id=128, 573.14125pt x 475.7775pt>
 File: lots.png Graphic file (type png)
  <use lots.png>
 Package pdftex.def Info: lots.png used on input line 198.
@@ -966,7 +949,7 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-[6] <addon.png, id=140, 767.86874pt x 216.81pt>
+[6] <addon.png, id=146, 767.86874pt x 216.81pt>
 File: addon.png Graphic file (type png)
  <use addon.png>
 Package pdftex.def Info: addon.png used on input line 248.
@@ -984,7 +967,7 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-<param.png, id=142, 306.14375pt x 536.0025pt>
+<param.png, id=150, 306.14375pt x 536.0025pt>
 File: param.png Graphic file (type png)
  <use param.png>
 Package pdftex.def Info: param.png used on input line 269.
@@ -1003,34 +986,34 @@ Underfull \hbox (badness 10000) in paragraph at lines 275--276
 
  []
 
-[7] <view1.png, id=149, 1430.34375pt x 773.89125pt>
-File: view1.png Graphic file (type png)
- <use view1.png>
-Package pdftex.def Info: view1.png used on input line 278.
-(pdftex.def)             Requested size: 649.75696pt x 351.55426pt.
- [8]
-<view2.png, id=154, 1427.3325pt x 769.87625pt>
-File: view2.png Graphic file (type png)
- <use view2.png>
-Package pdftex.def Info: view2.png used on input line 281.
-(pdftex.def)             Requested size: 649.75696pt x 350.47046pt.
- [9 <./view1.png>] <view4.png, id=160, 1440.38126pt x 765.86125pt>
-File: view4.png Graphic file (type png)
- <use view4.png>
-Package pdftex.def Info: view4.png used on input line 284.
-(pdftex.def)             Requested size: 649.75696pt x 345.47577pt.
- [10 <./view2.png>] <view5.png, id=166, 1418.29875pt x 754.82pt>
-File: view5.png Graphic file (type png)
- <use view5.png>
-Package pdftex.def Info: view5.png used on input line 287.
-(pdftex.def)             Requested size: 649.75696pt x 345.80475pt.
- [11 <./view4.png>] <view3.png, id=173, 690.58pt x 769.87625pt>
+[7] <view3.png, id=160, 690.58pt x 769.87625pt>
 File: view3.png Graphic file (type png)
  <use view3.png>
-Package pdftex.def Info: view3.png used on input line 290.
+Package pdftex.def Info: view3.png used on input line 277.
 (pdftex.def)             Requested size: 452.96796pt x 504.98335pt.
 
-(./report.bbl [12 <./view5.png>]
+<view1.png, id=161, 1430.34375pt x 773.89125pt>
+File: view1.png Graphic file (type png)
+ <use view1.png>
+Package pdftex.def Info: view1.png used on input line 281.
+(pdftex.def)             Requested size: 649.75696pt x 351.55426pt.
+ [8 <./view3.png>] <view2.png, id=167, 1427.3325pt x 769.87625pt>
+File: view2.png Graphic file (type png)
+ <use view2.png>
+Package pdftex.def Info: view2.png used on input line 284.
+(pdftex.def)             Requested size: 649.75696pt x 350.47046pt.
+ [9 <./view1.png>] <view4.png, id=174, 1440.38126pt x 765.86125pt>
+File: view4.png Graphic file (type png)
+ <use view4.png>
+Package pdftex.def Info: view4.png used on input line 287.
+(pdftex.def)             Requested size: 649.75696pt x 345.47577pt.
+ [10 <./view2.png>] <view5.png, id=180, 1418.29875pt x 754.82pt>
+File: view5.png Graphic file (type png)
+ <use view5.png>
+Package pdftex.def Info: view5.png used on input line 290.
+(pdftex.def)             Requested size: 649.75696pt x 345.80475pt.
+
+(./report.bbl [11 <./view4.png>]
 ./report.bbl:3: Undefined control sequence.
 <argument> \protect \citename 
                               {Eberly, }2005
@@ -1042,6 +1025,7 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
+[12 <./view5.png>]
 ./report.bbl:8: Undefined control sequence.
 <argument> \protect \citename 
                               {Kelly \& McCabe, }2007
@@ -1064,32 +1048,28 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-[13 <./view3.png>])
+)
 Package atveryend Info: Empty hook `BeforeClearDocument' on input line 300.
- [14] [15 <./devS.png> <./devL.png>] [16 <./lake.png> <./lake_hull.png>] [17 <.
-/s0.png> <./s1.png> <./s2.png>] [18 <./s3.png> <./s4.png> <./sF.png>] [19 <./ce
-llU.png>] [20 <./cellS.png>] [21 <./cellR.png>] [22 <./alllots.png>] [23 <./lot
-s.png> <./addon.png>] [24 <./param.png>]
+ [13] [14 <./devS.png> <./devL.png>] [15 <./lake.png> <./lake_hull.png>]
+[16 <./s0.png> <./s1.png> <./s2.png>] [17 <./s3.png> <./s4.png> <./sF.png>]
+[18 <./cellU.png>] [19 <./cellS.png>] [20 <./cellR.png>] [21 <./alllots.png>]
+[22 <./lots.png> <./addon.png>] [23 <./param.png>]
 Package atveryend Info: Empty hook `AfterLastShipout' on input line 300.
  (./report.aux)
 Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 300.
 Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 300.
 Package rerunfilecheck Info: File `report.out' has not changed.
 (rerunfilecheck)             Checksum: 5D5852DA37B29AAC61DE7D734E282332;767.
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
 Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 300.
  ) 
 Here is how much of TeX's memory you used:
- 8393 strings out of 493308
- 127088 string characters out of 6137817
- 262211 words of memory out of 5000000
+ 8392 strings out of 493308
+ 127081 string characters out of 6137817
+ 262237 words of memory out of 5000000
  11633 multiletter control sequences out of 15000+600000
  13075 words of font info for 53 fonts, out of 8000000 for 9000
  957 hyphenation exceptions out of 8191
- 41i,6n,51p,998b,431s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 41i,7n,51p,998b,431s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb
 ></usr/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb>
 </usr/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></
@@ -1098,10 +1078,10 @@ r/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmssbx10.pfb></u
 sr/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></us
 r/local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr
 /local/texlive/2013/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb>
-Output written on report.pdf (24 pages, 10049104 bytes).
+Output written on report.pdf (23 pages, 10049065 bytes).
 PDF statistics:
  305 PDF objects out of 1000 (max. 8388607)
- 223 compressed objects within 3 object streams
- 67 named destinations out of 1000 (max. 500000)
+ 224 compressed objects within 3 object streams
+ 66 named destinations out of 1000 (max. 500000)
  228 words of extra memory for PDF output out of 10000 (max. 10000000)
 

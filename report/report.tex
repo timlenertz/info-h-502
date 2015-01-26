@@ -24,26 +24,26 @@
 \maketitle
 
 \section{Introduction}
-The goal of this project is to develop a Blender add-on that generates a randomized city model. The city should consist of a street layout, different kinds of buildings, lakes, gardens and parcs. All of these elements should be randomized as well.
+The goal of this project is to develop a Blender add-on that generates a randomised city model. The city should consist of a street layout, different kinds of buildings, lakes, gardens and parcs. All of these elements should be randomised as well.
 
 \section{Methodology}
-In order to generate a credible model of a random city, a logical approach is to emulate the way a city evolves in reality: Streets are shaped according to the shape of the terrain, and in relation to previously existing infrastructure. Also the most developped part tends to be located near a city center, while more remote areas remain more rural.
+In order to generate a credible model of a random city, a logical approach is to emulate the way a city evolves in reality: Streets are shaped according to the shape of the terrain, and in relation to previously existing infrastructure. Also the most developed part tends to be located near a city center, while more remote areas remain more rural.
 
 This project is based on the \emph{Citygen} system described in \cite{Kell2007}. The city model is generated following these steps:
 \begin{enumerate}
 \item A terrain height-map is created featuring some erosion.
 \item Primary streets are put on the terrain, and made to connect some randomly defined intersection points. The streets' shape is guided by the terrain shape.
 \item The regions enclosed by primary streets are the \emph{city cells}. According to its distance from the center, each city cell is attributed a \emph{profile} that indicates whether this cell will contain a given type of city buildings and streets, or more rural content.
-\item For city cells that shall contain city buildings, a network of \emph{secondary roads} is created. Starting from two or more points on the enclosing primary street cycle, secondry roads are \emph{grown} into the city cell using a recursive algorithm that simulates the real evolution of a street layout.
+\item For city cells that shall contain city buildings, a network of \emph{secondary roads} is created. Starting from two or more points on the enclosing primary street cycle, secondary roads are \emph{grown} into the city cell using a recursive algorithm that simulates the real evolution of a street layout.
 \item Each region enclosed by these secondary roads is called a \emph{block}. Each block is subdivided into \emph{lots}, and the lots placed next to a road will contain a building.
-\item For each of these lots, a certain kind of building is created with some randomization.
+\item For each of these lots, a certain kind of building is created with some randomisation.
 \end{enumerate}
 The following text describes these 6 steps in more detail. The problems encountered in implementing the algorithms are described in section \ref{sec:implementation}.
 
 \subsection{Terrain}
 For generating a random height map for the terrain, the \emph{diamond-square} algorithm is used. The basic idea is to start with a height map consisting only of a $2 \times 2$ matrix giving the elevations of the 4 corner points. A mid-point displacement algorithm then expands this into a $3 \times 3$ matrix by interpolating the 5 intermediate values and adding a random amount. Then the process is recursively repeated for each of the 4 new $2 \times 2$ submatrices, with a smaller random additive value. This process yields a fractal terrain height map, but with visual bias towards the X and Y directions of the grid, as can be seen in figure \ref{fig:plasma}
 
-The diamond-square algorithm is an improvement which adds a ``diamond step'' after the ``square step'', so as to combine interpolation in the straight and diagonal directions. The roughness of the terrain can be parametrized. However a stongly uneven terrain causes problems with the algorithms, ad parts of the city (e.g. streets) will get under the terrain.
+The diamond-square algorithm is an improvement which adds a ``diamond step'' after the ``square step'', so as to combine interpolation in the straight and diagonal directions. The roughness of the terrain can be parametrised. However a strongly uneven terrain causes problems with the algorithms, ad parts of the city (e.g. streets) will get under the terrain.
 
 \begin{figure}[h]
 \center
@@ -91,7 +91,7 @@ The planar water surface is mostly hidden under the terrain, and intersects it a
 
 
 \subsection{Secondary Roads}
-The other 3 kinds of city cells contain secondary roads and buildings. The secondary roads are \emph{grown} inwards into the city cell from several points simulteneously. To start with, the program chooses 2 or more (depending on cell type) \emph{starting points} on the enclosing primary road cycle. From each one of those, a first secondary road segment is added pointing inwards. The two end points of these new segments are called the \emph{extremities}.  
+The other 3 kinds of city cells contain secondary roads and buildings. The secondary roads are \emph{grown} inwards into the city cell from several points simultaneously. To start with, the program chooses 2 or more (depending on cell type) \emph{starting points} on the enclosing primary road cycle. From each one of those, a first secondary road segment is added pointing inwards. The two end points of these new segments are called the \emph{extremities}.  
 
 From each extremity point, $n$ new segments are added, pointing at different angles inside a total \emph{span angle}. Their angles are randomly distributed in the span angle by a normal distribution with some deviation. For each of those new proposed segments, a \emph{snap test} is performed to see if the new segment would cross an existing segment, cross a primary street, or come too close (within snap distance) to an existing road. There checks are performed in three steps, as detailed in \cite{Kell2007}. If the result is negative, the new segment is added. If the result is positive, the segment is either discarded, or a segment joining the extremity with the existing road is added instead. The choice is determined by a fixed probability. This procedure is executed for each extremity point alternately, and repeated until there are no more extremity points. The figures \fig{fig:sec1} to \fig{fig:secF} illustrate a stepwise execution of this algorithm.
 
@@ -138,7 +138,7 @@ From each extremity point, $n$ new segments are added, pointing at different ang
 \end{figure}
 
 The parameters for the algorithm are chosen depending on the type of cell:
-
+\\ \\
 \begin{tabular}{l | c | c | c}
 	\textbf{Cell type} & \textbf{Urban} & \textbf{Suburban} & \textbf{Rural} \\
 	\hline 
@@ -150,8 +150,8 @@ The parameters for the algorithm are chosen depending on the type of cell:
 	Angle deviation & 0 & 0.5 & 0.5 \\
 	Join Probability & 100\% & 40\% & 20\% \\
 \end{tabular}
-
-The parameters for urban cells produce a checkerboard pattern: Angles of -90, 0 and +90 degrees are forced, and the new segments are always joined to existing ones where possible. The different outcomes for the three cell types are shown in figures \fig{fig:cellU}, \fig{fig:cellS} and \fig{fig:cellR}.
+\\ \\
+The parameters for urban cells produce a checkerboard pattern: Angles of -90, 0 and +90 degrees are forced, and the new segments are always joined to existing ones where possible. The different outcomes for the three cell types are shown in figures \ref{fig:cellU}, \ref{fig:cellS} and \ref{fig:cellR}.
 
 \begin{figure}[h]
 \center
@@ -206,7 +206,7 @@ Three kinds of buildings are implemented: Skyscrapers, Offices and Houses. Each 
 
 Both offices and houses consist simply of an extrusion of the lot shape, after it has been contracted by some decimeters. For houses, a slanted roof is added on top. Offices are taller and have a flat roof.
 
-Skyscrapers are generated using a recursive algorithm similar to what's described in \cite{Pari2001}. In the article a method is presented to describe complex building shaping mechanisms using an \emph{L-System} operating on a grammar. The algorithm here simple operated recursively on in two steps:
+Skyscrapers are generated using a recursive algorithm similar to what's described in \cite{Pari2001}. In the article a method is presented to describe complex building shaping mechanisms using an \emph{L-System} operating on a grammar. The algorithm here simply operates recursively in two steps:
 
 Starting with a bounding box, the upper rectangle is cut with another, slightly smaller rectangle. The remaining part is sliced/intruded downwards down to a given base height. Then the procedure is repeated with the remaining tower bounding box. During the first half of the process, the base is chosen at the lower range, during the second half, it is at the upper range. The results can be seen in the screenshots.
 
@@ -216,12 +216,12 @@ Starting with a bounding box, the upper rectangle is cut with another, slightly 
 The program consists of a Blender add-on. Some details regarding the implementation of the algorithms in Blender:
 \begin{itemize}
 \item The code is modular and object-oriented. The city is represented as a composition of objects representing the whole city, a city cell, a block and a building.
-\item The generation of the city happens in two stages. First an internal representation is generated, using \texttt{City.generate()}. During this process the random number generator is used and the composition of objects holding the city is created. No Blender objects are created or used. As a result, it would be easily possible to uncouple the program from Blender.
+\item The generation of the city happens in two stages. First an internal representation is generated, using \texttt{City.generate()}. During this process the random number generator is used and the composition of objects holding the city is created. No Blender objects are created or used. As a result, it would be easily possible to uncouple the program from Blender. Also during this process, previously created elements (e.g. the terrain height map) can be remodified, before the final Blender objects are created from it.
 \item After the internal representation has been generated, the recursive call to \\ \texttt{City.create\_blender\_object()} generates a hierarchy of Blender objects for the city. This process no longer uses the random number generator and thus it is entirely deterministic.
 \item All randomization is based on the Python \texttt{random} random number generator. Thus by setting the same seed value, the exact same city will be generated. The functionality to explicitly define a seed is included in the user interface.
 \item All of the \texttt{create\_blender\_object} process operates on Blender \textt{data}, and never on \texttt{operators}.
-\item For the primary streets, a premade, textured segment from \texttt{assets.blender} is imported into the scene. Then it is chained to itself $n$ times using the \emph{Array} modifier, and the chain is aligned to a road using the \emph{Curve} modifier.
-\item For secondary roads which remain straight, the premade segment is scaled in one direction, and then aligned to the line segment using the \emph{Curve} modifier. The scale of the texture needs to be readjusted to remain constant with regard to the scene.
+\item For the primary streets, a pre-made, textured segment from \texttt{assets.blender} is imported into the scene. Then it is chained to itself $n$ times using the \emph{Array} modifier, and the chain is aligned to a road using the \emph{Curve} modifier.
+\item For secondary roads which remain straight, the pre-made segment is scaled in one direction, and then aligned to the line segment using the \emph{Curve} modifier. The scale of the texture needs to be readjusted to remain constant with regard to the scene.
 \item The roads segments with their meshes and their textures are \emph{linked} from the \texttt{assets.blender} file. As a result no unnecessary copies of it are made in-memory.
 \tem The \emph{NetworkX} (\url{https://networkx.github.io}) Python library is used and needs to be installed into Blender's python distribution.
 \end{itemize}
@@ -230,10 +230,10 @@ The program consists of a Blender add-on. Some details regarding the implementat
 Due to time constraints and other problems, the project is unfinished and there are several bugs and errors in the implementations. The main remaining problems:
 \begin{itemize}
 \item The buildings are untextured. However, texturization would be relatively simple to add, since adding a texture and possibly a bump map to the facades of the buildings could already give a realistic effect on the large scale.
-\item There are bugs in the program. In rare cases it loops infinitly or crashes.
+\item There are bugs in the program. In rare cases it loops infinitely or crashes.
 \item There are some problems remaining with the \emph{minimal cycle basis} implementation in \texttt{mcb.py}. Because of the combinatorial complexity, this algorithm is hard to debug by simple testing.
 \item The algorithm used to expand and contract polygons is not correct in all cases and leads to the results seen in figure \ref{fig:alllots}. Sometimes buildings can have incorrect shapes (non-simple polygons), and cross over roads.
-\item Streets are not well adapted to the terrain. They get simply placed near the terrain surface, without taking into consideration the mesh of the terrain. A better implemenentation could ``draw'' the streets onto the terrain surface, and then extrude from it.
+\item Streets are not well adapted to the terrain. They get simply placed near the terrain surface, without taking into consideration the mesh of the terrain. A better implementation could ``draw'' the streets onto the terrain surface, and then extrude from it.
 \item Likewise, street intersections are not handled well. Different primary/secondary street segments simply intersect each other. However, the chaining of primary road segments is handled correctly because of the \emph{Array} modifier.
 \item There is an attempted solution to the terrain-street intersections: The terrain is flattened and embossed slightly below streets. However this still produces incorrect results.
 \end{itemize}
@@ -260,7 +260,7 @@ When installed, the panel shown in \ref{fig:param} is displayed in the Blender t
 \item[Size] Side length of the (square) city terrain in meters.
 \item[Elevation] Multiplier for the terrain elevation. Larger value results in more noisy terrain. Zero results in perfectly flat terrain.
 \item[Junctions] Approximate number of primary street junctions. Rounded up to allow for $n \cross m$ grid. Determines number of city cells.
-\item[Grid Alignment] The higher this setting, the more closely the cells are aligned on a regular grid. See figures \emph{fig:primaryS} and \emph{fig:primaryL}.
+\item[Grid Alignment] The higher this setting, the more closely the cells are aligned on a regular grid. See figures \ref{fig:primaryS} and \ref{fig:primaryL}.
 \item[Urbanization] The higher this value, the more urban cells generated compared to rural cells.
 \end{description}
 
@@ -273,6 +273,9 @@ When installed, the panel shown in \ref{fig:param} is displayed in the Blender t
 
 \section{Results}
 Some results obtained with the add-on: \\ \\
+\center
+\includegraphics[width=\textwidth]{view3.png}
+
 
 \center
 \includegraphics[width=\textheight,angle=90]{view1.png}
@@ -285,9 +288,6 @@ Some results obtained with the add-on: \\ \\
 
 \center
 \includegraphics[width=\textheight,angle=90]{view5.png}
-
-\center
-\includegraphics[width=\textwidth]{view3.png}
 
 
 
