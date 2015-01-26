@@ -55,12 +55,12 @@ class LakeCell(Cell):
 		self.basins = []
 		num_centers = random.randint(1, 4)
 		for i in range(num_centers):
-			max_div = 0.3 * cell_center_to_boundary
+			max_div = 0.7 * cell_center_to_boundary
 			dx = max_div * random.uniform(-1.0, 1.0)
 			dy = max_div * random.uniform(-1.0, 1.0)
 			center = (cell_center[0] + dx, cell_center[1] + dy)
 			
-			radius = self.lo_cycle.point_distance(center) * random.uniform(0.6, 1.0)
+			radius = self.lo_cycle.point_distance(center) * random.uniform(0.6, 1.6)
 			depth = radius * random.uniform(0.8, 1.2) / num_centers
 			self.basins.append( (center, radius, depth ) )
 		
@@ -87,7 +87,7 @@ class LakeCell(Cell):
 				self.level = min(self.level, z)
 		
 		self.water_outline = util.convex_hull(points)
-		self.level = self.level - 0.3
+		self.level = self.level - 0.5
 			
 
 
@@ -107,16 +107,23 @@ class LakeCell(Cell):
 				return depth * ((1.0 - math.cos(a))/2.0 - 1.0)
 		
 		# Iterate over these pixels to emboss terrain...
+		maxd = self.hi_cycle.maximal_distance()
 		for im_x in range(mn[0], mx[0]):
 			for im_y in range(mn[1], mx[1]):
 				p = self.terrain.to_terrain(im_x, im_y)
-				
+				#if not self.lo_cycle.contains_point(p):
+				#	continue
+
 				emboss = 0.0
 				for basin in self.basins:
 					emboss += emboss_for_basin_at_point(basin, p)
 				
-				self.terrain.image[im_y][im_x] += emboss / self.terrain.elevation
-	
+				d = self.hi_cycle.point_distance(p)
+				noise = random.uniform(-1.0, 1.0) * (d / maxd) * 10.0
+				
+				self.terrain.image[im_y][im_x] += (emboss + noise) / self.terrain.elevation
+
+
 
 	def create_blender_object(self, root):
 		# Mesh
@@ -260,7 +267,7 @@ class RoadsCell(Cell):
 		# Grow secondary roads
 		grow = True
 		i = 0
-		max_iterations = 30
+		max_iterations = 100
 		while grow:
 			grow = False
 			new_extremities = []
@@ -501,6 +508,7 @@ class BlocksCell(RoadsCell):
 	
 	lot_area_range = None
 	building_types = None
+	sidewalk_width = None
 	
 	def __init__(self, city, hi_cycle, lo_cycle, profile):
 		super(BlocksCell, self).__init__(city, hi_cycle, lo_cycle, profile)		
@@ -508,17 +516,20 @@ class BlocksCell(RoadsCell):
 		if profile == 'URBAN':
 			self.lot_area_range = (80, 200)
 			self.building_types = ['Skyscraper', 'Office']
+			self.sidewalk_width = 3.5
 		elif profile == 'SUBURBAN':
 			self.lot_area_range = (100, 150)
 			self.building_types = ['Office', 'House']
+			self.sidewalk_width = 5.0
 		elif profile == 'RURAL':
 			self.lot_area_range = (100, 200)
 			self.building_types = ['House']
+			self.sidewalk_width = 10.0
 
 
 	def generate(self):
 		super(BlocksCell, self).generate()
-	
+
 		# Blocks = areas enclosed by road graph
 		full_graph = self.full_graph_low()
 		block_cycles = mcb.planar_graph_cycles(full_graph)
@@ -537,6 +548,6 @@ class BlocksCell(RoadsCell):
 		parent = bpy.data.objects.new('blocks', None)
 		parent.parent = root
 		bpy.context.scene.objects.link(parent)
-		
+
 		for block in self.blocks:
 			block.create_blender_object(parent)

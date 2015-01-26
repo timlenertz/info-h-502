@@ -28,6 +28,7 @@ class City(object):
 	road_number_of_samples = 15
 	road_snap_distance = 15.0
 	road_deviation_angle = math.radians(8.0)
+	urbanization = 0.5
 	
 	# Primary roads are represented on two levels:
 	# High-level = Graph connecting intersection points
@@ -201,7 +202,8 @@ class City(object):
 			self.roads[self.__road_key(a, b)] = road
 	
 	
-	def __create_city_cell(self, hi_cycle, lo_cycle, remoteness):		
+	def __create_city_cell(self, hi_cycle, lo_cycle, remoteness):	
+		remoteness *= (self.urbanization * 2.0)	
 		if remoteness < 0.2:
 			return citycell.BlocksCell(self, hi_cycle, lo_cycle, 'URBAN')
 		elif remoteness < 0.4:
@@ -277,9 +279,10 @@ class City(object):
 		i = 0
 
 		for p in road:
-			z = self.__original_elevations[p]
-			x, y = p
-			polyline.points[i].co = (x, y, z, 1.0)
+			if p in self.__original_elevations:
+				z = self.__original_elevations[p]
+				x, y = p
+				polyline.points[i].co = (x, y, z, 1.0)
 			i += 1
 		
 		curve_obj = bpy.data.objects.new(name + "_curve", curve)
@@ -343,7 +346,8 @@ class City(object):
 		for key in self.roads:
 			for a, b in util.list_pairs(self.roads[key]):
 				self.terrain.flatten_segment(a, b, self.__original_elevations[a], self.__original_elevations[b])
-			
+		
+
 		# Create the city cells with their contents
 		self.__create_city_cells()
 			
@@ -372,7 +376,7 @@ class City(object):
 			i += 1
 			road = self.roads[key]
 			self.__create_blender_road(parent, 'primary_road_' + str(i), road)
-		
+			
 		# City Cells		
 		i = 0
 		for cell in self.city_cells:
@@ -382,7 +386,7 @@ class City(object):
 			cell_parent.parent = root
 			cell.create_blender_object(cell_parent)
 
-		#self.__create_blender_curve_for_road(root, 'random walk', self.random_walk(10))
+		self.__create_blender_curve_for_road(root, 'random walk', self.random_walk(10))
 
 		
 		return root

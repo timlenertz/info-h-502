@@ -186,7 +186,7 @@ class Polygon:
 	def __iter__(self):
 		return self.vertices_iter()
 	
-	def contains_point(pt):
+	def contains_point(self, p):
 		"""Check of pt is inside the polygon. pt is (float, float) tuple."""
 		c = False
 		for a, b in self.edges_iter():
@@ -259,7 +259,10 @@ class Polygon:
 			x += pt[0]
 			y += pt[1]
 		n = len(self.vertices)
-		return (x / n, y / n)
+		if n != 0:
+			return (x / n, y / n)
+		else:
+			return (0, 0)
 	
 	def bounding_box(self):
 		mn = self.vertices[0]

@@ -45,11 +45,17 @@ class Lot(object):
 		for x, y in self.outline.vertices_iter():
 			position = (position[0] + x, position[1] + y)
 		position = (position[0] / 4.0, position[1] / 4.0)
+		
+		w *= 0.8
+		h *= 0.8
 	
 		return (w, h), position, rotation
 	
 	
 	def generate(self):
+		if not self.outline.is_simple():
+			return
+	
 		building_types = self.city_cell.building_types[:]
 	
 		if not self.is_near_rectangular():
@@ -63,7 +69,8 @@ class Lot(object):
 		self.building.generate()
 	
 	def create_blender_object(self, parent, name):
-		self.building.create_blender_object(parent, name+'_building')
+		if self.building is not None:
+			self.building.create_blender_object(parent, name+'_building')
 
 	
 
@@ -75,7 +82,7 @@ class Block(object):
 	cycle = None  # Roads enclosing block, clockwise Polygon.
 	contracted_cycle = None # Same polygon, contracted for sidewalks space.
 	
-	sidewalk_width = 5.0
+	sidewalk_width = None
 	valid = True
 	lots = None
 
@@ -83,6 +90,7 @@ class Block(object):
 		self.city_cell = city_cell
 		self.cycle = cycle
 		self.cycle.make_clockwise()
+		self.sidewalk_width = self.city_cell.sidewalk_width
 			
 	
 	def __split_lot_recursive(self, lot, outer_edges, depth):
@@ -103,7 +111,6 @@ class Block(object):
 		
 		if locked_in or lot.area() < self.city_cell.lot_area_range[0]:
 			return
-			
 		elif lot.area() < self.city_cell.lot_area_range[1] and lot.is_simple():
 			def angle(edge_pair):
 				e1, e2 = edge_pair
@@ -197,7 +204,7 @@ class Block(object):
 		outer_edges = list(self.contracted_cycle.edges_iter())
 		self.__split_lot_recursive(self.contracted_cycle, outer_edges, 1)
 
-	def __create_blender_outline(self, cyc):
+	def __create_blender_outline(self, root, cyc):
 		if len(self.cycle) < 2:
 			return
 		curve = bpy.data.curves.new(name='cycle', type='CURVE')
@@ -214,7 +221,7 @@ class Block(object):
 		
 		
 		curve_obj = bpy.data.objects.new('cycle_curv', curve)
-		#curve_obj.parent = root
+		curve_obj.parent = root
 		
 		bpy.context.scene.objects.link(curve_obj)
 
@@ -229,7 +236,8 @@ class Block(object):
 		
 		
 		self.valid = self.contracted_cycle.is_simple() \
-			and self.contracted_cycle.area() <= self.city_cell.lot_area_range[0]
+			and self.contracted_cycle.is_clockwise() \
+			and self.contracted_cycle.area() > self.city_cell.lot_area_range[0]
 		
 		if not self.valid:
 			return

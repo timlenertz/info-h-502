@@ -120,7 +120,7 @@ class Terrain(HeightMap):
 	
 
 
-	def create_blender_object(self, parent):	
+	def create_blender_object(self, parent):
 		"""Create textured blender object for the terrain."""
 		# Create mesh and object with that mesh
 		terrain_mesh = self.create_blender_mesh('terrain')
@@ -138,7 +138,7 @@ class Terrain(HeightMap):
 		terrain_obj.data.materials.append(mat)
 		
 		# Create texture for the material
-		tex = assets.load_texture('terrain')
+		tex = assets.load_texture('terrain.jpg')
 		mtex = mat.texture_slots.add()
 		mtex.texture = tex
 		mtex.texture_coords = 'UV'
