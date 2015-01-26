@@ -1,7 +1,7 @@
 import os
 import bpy
 
-def load_assets_library(link=True):
+def load_assets_library(link):
 	lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets.blend')
 	return bpy.data.libraries.load(lib, link=link)
 

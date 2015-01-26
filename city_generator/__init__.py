@@ -18,10 +18,9 @@ if 'bpy' in locals():
 	imp.reload(util)
 	imp.reload(mcb)
 	imp.reload(block)
-	imp.reload(blocklot)
 	imp.reload(building)
 else:
-	from . import city, terrain, assets, citycell, util, mcb, block, blocklot, building
+	from . import city, terrain, assets, citycell, util, mcb, block, building
 	import bpy
 
 
@@ -191,8 +190,8 @@ class OBJECT_OT_GenerateCity(bpy.types.Operator):
 			scene.terrain_initial_height_min,
 			scene.terrain_initial_height_max
 		)
-		cit.terrain.width = math.sqrt(scene.terrain_area)
-		cit.terrain.height = scene.terrain_height
+		cit.terrain.side_length = math.sqrt(scene.terrain_area)
+		cit.terrain.elevation = scene.terrain_height
 		cit.approximate_number_of_intersection_points = scene.plan_intersections
 		cit.edges_deviation = scene.plan_intersection_deviation
 		cit.road_step_distance = scene.step_distance
@@ -202,6 +201,11 @@ class OBJECT_OT_GenerateCity(bpy.types.Operator):
 		cit.generate()
 		city_root = cit.create_blender_object(scene.city_name)
 		bpy.context.scene.objects.link(city_root)
+		
+		#sk = building.Skyscraper([])
+		#sk.generate()
+		#sk.create_blender_object(None)
+		
 		return { 'FINISHED' }
 
 

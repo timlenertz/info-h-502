@@ -4,18 +4,78 @@ import math
 import bpy
 import networkx as nx
 
-from . import util, blocklot
+from . import util, building
 
-class CityBlock(object):
+class Lot(object):
+	city_cell = None
+	city = None
+	terrain = None
+	outline = None
+	outer_edges = None
+	
+	building = None
+
+	def __init__(self, city_cell, outline, outer_edges):
+		self.city_cell = city_cell
+		self.city = self.city_cell.city
+		self.terrain = self.city.terrain
+		self.outline = outline
+		self.outer_edges = outer_edges
+		
+	def is_near_rectangular(self):
+		if self.outline.number_of_vertices() != 4:
+			return False
+		for e1, e2 in util.cycle_pairs(list(self.outline.edges_iter())):
+			if not util.near_perpendicular(e1, e2):
+				return False
+		return True
+	
+	def rectangle_pose(self):
+		edges = list(self.outline.edges_iter())
+		e, f = (edges[0], edges[2])
+		w = (util.line_to_point_distance(e, f[0]) + util.line_to_point_distance(e, f[1]) \
+			+ util.line_to_point_distance(f, e[0]) + util.line_to_point_distance(f, e[1])) / 4.0
+		rotation = math.atan2(e[1][1] - e[0][1], e[1][0] - e[0][0]) + np.pi
+		
+		e, f = (edges[1], edges[3])
+		h = (util.line_to_point_distance(e, f[0]) + util.line_to_point_distance(e, f[1]) \
+			+ util.line_to_point_distance(f, e[0]) + util.line_to_point_distance(f, e[1])) / 4.0
+		
+		position = (0.0, 0.0)
+		for x, y in self.outline.vertices_iter():
+			position = (position[0] + x, position[1] + y)
+		position = (position[0] / 4.0, position[1] / 4.0)
+	
+		return (w, h), position, rotation
+	
+	
+	def generate(self):
+		building_types = self.city_cell.building_types[:]
+	
+		if not self.is_near_rectangular():
+			if 'Skyscraper' in building_types:
+				building_types.remove('Skyscraper')
+
+		type = random.choice(building_types)
+		Class = getattr(building, type)
+		self.building = Class(self) 
+		
+		self.building.generate()
+	
+	def create_blender_object(self, parent, name):
+		self.building.create_blender_object(parent, name+'_building')
+
+	
+
+class Block(object):
 	"""Block of a city cell, enclosed by secondary (and primary) roads.
 	
 	Gets further subdivided into lots, one for each building."""
-	city_cell = None
+	city_cell = None # BlocksCell object
 	cycle = None  # Roads enclosing block, clockwise Polygon.
 	contracted_cycle = None # Same polygon, contracted for sidewalks space.
 	
 	sidewalk_width = 5.0
-	minimal_area = 30.0
 	valid = True
 	lots = None
 
@@ -41,10 +101,10 @@ class CityBlock(object):
 				locked_in = False
 				break
 		
-		if locked_in:
+		if locked_in or lot.area() < self.city_cell.lot_area_range[0]:
 			return
 			
-		elif lot.area() < minimal_area and lot.is_simple():
+		elif lot.area() < self.city_cell.lot_area_range[1] and lot.is_simple():
 			def angle(edge_pair):
 				e1, e2 = edge_pair
 				v1, v2 = vec(e1), vec(e2)
@@ -55,7 +115,7 @@ class CityBlock(object):
 			min_angle = min(util.cycle_pairs(edges), key=angle)
 			if angle(min_angle) > 0.3*np.pi:
 				lot_outer = [edge for edge in edges if (edge in outer_edges)]
-				lot_obj = blocklot.Lot(self.city_cell, lot, lot_outer)
+				lot_obj = Lot(self.city_cell, lot, lot_outer)
 				self.lots.append(lot_obj)
 				
 		elif lot.number_of_vertices() >= 3 and depth <= max_iterations:
@@ -128,8 +188,8 @@ class CityBlock(object):
 
 
 			# Recurse into two lots
-			self.__split_lot_recursive(sublot1, outer_edges[:], depth + 1)
-			self.__split_lot_recursive(sublot2, outer_edges[:], depth + 1)
+			self.__split_lot_recursive(util.Polygon(sublot1), outer_edges[:], depth + 1)
+			self.__split_lot_recursive(util.Polygon(sublot2), outer_edges[:], depth + 1)
 	
 	
 	def __make_lots(self):
@@ -137,18 +197,39 @@ class CityBlock(object):
 		outer_edges = list(self.contracted_cycle.edges_iter())
 		self.__split_lot_recursive(self.contracted_cycle, outer_edges, 1)
 
+	def __create_blender_outline(self, cyc):
+		if len(self.cycle) < 2:
+			return
+		curve = bpy.data.curves.new(name='cycle', type='CURVE')
+		curve.dimensions = '3D'
+		
+		polyline = curve.splines.new('POLY')
+
+		polyline.points.add(len(cyc))
+		i = 0
+		for p in cyc:
+			polyline.points[i].co = (p[0], p[1], 10.0, 1.0)
+			i += 1
+		polyline.points[i].co = (cyc[0][0], cyc[0][1], 10.0, 1.0)
+		
+		
+		curve_obj = bpy.data.objects.new('cycle_curv', curve)
+		#curve_obj.parent = root
+		
+		bpy.context.scene.objects.link(curve_obj)
+
 
 	def generate(self):
-		if self.cycle.area() <= self.minimal_area:
+		if self.cycle.area() <= self.city_cell.lot_area_range[0]:
 			self.valid = False
 			return
 		
 		self.contracted_cycle = self.cycle.clone()
 		self.contracted_cycle.contract(self.sidewalk_width)
 		
+		
 		self.valid = self.contracted_cycle.is_simple() \
-			and self.contracted_cycle.is_clockwise() \
-			and self.contracted_cycle.area() <= self.minimal_area
+			and self.contracted_cycle.area() <= self.city_cell.lot_area_range[0]
 		
 		if not self.valid:
 			return
@@ -167,6 +248,8 @@ class CityBlock(object):
 		parent.parent = root
 		bpy.context.scene.objects.link(parent)
 		
+		i = 0
 		for lot in self.lots:
-			lot.create_blender_object(parent)
+			lot.create_blender_object(parent, 'lot_'+str(i))
+			i += 1
 		

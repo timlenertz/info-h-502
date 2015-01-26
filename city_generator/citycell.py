@@ -29,20 +29,30 @@ class Cell(object):
 	
 	def generate(self):
 		pass
+	
+	def full_graph_low(self):
+		graph = nx.Graph()
+		for edge in self.lo_cycle.edges_iter():
+			graph.add_edge(*edge)
+		return graph
 
 
 class LakeCell(Cell):
 	"""Cell containing lake. Embosses terrain and adds water surface."""
+	level = None
+	basins = None
+	water_outline = None
+	
 	def __init__(self, city, hi_cycle, lo_cycle):
 		super(LakeCell, self).__init__(city, hi_cycle, lo_cycle)
 	
-	def __emboss_terrain(self):		
+	def __create_basins(self):
 		cell_center = self.lo_cycle.center()
 		cell_center_to_boundary = self.lo_cycle.point_distance(cell_center)
 		
 		# Randomly choose multiples basins for lake
 		# basin = (center point, radius, depth)
-		basins = []
+		self.basins = []
 		num_centers = random.randint(1, 4)
 		for i in range(num_centers):
 			max_div = 0.3 * cell_center_to_boundary
@@ -51,9 +61,37 @@ class LakeCell(Cell):
 			center = (cell_center[0] + dx, cell_center[1] + dy)
 			
 			radius = self.lo_cycle.point_distance(center) * random.uniform(0.6, 1.0)
-			depth = radius * random.uniform(0.8, 1.3)
-			basins.append( (center, radius, depth ) )
+			depth = radius * random.uniform(0.8, 1.2) / num_centers
+			self.basins.append( (center, radius, depth ) )
 		
+	
+	def __create_outline(self):
+		samples = 100
+		expand = 3.0
+		
+		angle_step = (2.0 * np.pi) / (samples + 1)
+
+		self.level = +np.inf
+		points = []
+		for basin in self.basins:
+			center, radius, depth = basin
+			angle = 0.0
+			for i in range(samples):
+				x = center[0] + (radius + expand)*math.cos(angle)
+				y = center[1] + (radius + expand)*math.sin(angle)
+				angle += angle_step
+				pt = (x, y)
+				points.append(pt)
+				
+				z = self.terrain.elevation_at(x, y)
+				self.level = min(self.level, z)
+		
+		self.water_outline = util.convex_hull(points)
+		self.level = self.level - 0.3
+			
+
+
+	def __emboss_terrain(self):		
 		# Bounding box in pixel coordinates
 		mn, mx = self.lo_cycle.bounding_box()
 		mn = self.terrain.to_image(*mn)
@@ -62,8 +100,11 @@ class LakeCell(Cell):
 		def emboss_for_basin_at_point(basin, p):
 			center, radius, depth = basin
 			dist = util.distance(p, center)
-			a = (dist * np.pi) / radius
-			return depth*((1.0 - math.cos(a))/2.0 - 1.0)
+			if dist > radius:
+				return 0.0
+			else:
+				a = (dist * np.pi) / radius
+				return depth * ((1.0 - math.cos(a))/2.0 - 1.0)
 		
 		# Iterate over these pixels to emboss terrain...
 		for im_x in range(mn[0], mx[0]):
@@ -71,21 +112,19 @@ class LakeCell(Cell):
 				p = self.terrain.to_terrain(im_x, im_y)
 				
 				emboss = 0.0
-				for basin in basins:
-					emboss -= emboss_for_basin_at_point(basin, p)
+				for basin in self.basins:
+					emboss += emboss_for_basin_at_point(basin, p)
 				
-				self.terrain.image[im_y][im_x] -= emboss
+				self.terrain.image[im_y][im_x] += emboss / self.terrain.elevation
 	
 
 	def create_blender_object(self, root):
 		# Mesh
 		vertices = []
-		for a, b in self.lo_cycle_edges():
-			vert = (a[0], a[1], self.level)
+		for p in self.water_outline.vertices_iter():
+			vert = (p[0], p[1], self.level)
 			vertices.append(vert)
-		faces = [[]]
-		for i in range(len(vertices)):
-			faces[0].append(i)
+		faces = [ list(range(len(vertices))) ]
 					
 		# Object
 		mesh = bpy.data.meshes.new('water')
@@ -100,16 +139,9 @@ class LakeCell(Cell):
 
 	
 	def generate(self):
-		# Emboss the terrain for the lake
+		self.__create_basins()	
 		self.__emboss_terrain()
-		
-		# Determine height of water surface
-		self.level = +np.inf
-		for p in self.lo_cycle.vertices_iter():
-			height = self.terrain.height_at(*p)
-			if height < self.level:
-				self.level = height
-		self.level -= 0.3
+		self.__create_outline()
 
 
 
@@ -125,13 +157,16 @@ class RoadsCell(Cell):
 	span_angle = None
 	angle_deviation = None
 	join_probability = None
+	starting_points = None
 
 	__in_med_cycle = None
+	__original_elevations = None
 
 	def __init__(self, city, hi_cycle, lo_cycle, profile):
 		super(RoadsCell, self).__init__(city, hi_cycle, lo_cycle)
 		
 		if profile == 'URBAN':
+			self.starting_points = 2
 			self.segment_size = 30.0
 			self.snap_size = 20.0
 			self.degree = 3
@@ -139,6 +174,7 @@ class RoadsCell(Cell):
 			self.angle_deviation = 0.0
 			self.join_probability = 1.0
 		elif profile == 'SUBURBAN':
+			self.starting_points = 4
 			self.segment_size = 30.0
 			self.snap_size = 20.0
 			self.degree = 2
@@ -146,6 +182,7 @@ class RoadsCell(Cell):
 			self.angle_deviation = 0.5
 			self.join_probability = 0.4	
 		elif profile == 'RURAL':
+			self.starting_points = 7
 			self.segment_size = 50.0
 			self.snap_size = 30.0
 			self.degree = 2
@@ -162,11 +199,11 @@ class RoadsCell(Cell):
 			or self.__in_med_cycle[(b, a)][len(road) - i - 1]
 
 	def __mark_in_med_cycle(self, a, b, i):
-		key = frozenset([a, b])
-		if key not in self.__in_med_cycle:
+		if (a, b) not in self.__in_med_cycle:
 			road = self.city.road_for_edge(a, b)
 			self.__in_med_cycle[(a, b)] = np.zeros(len(road), dtype=bool)
-			self.__in_med_cycle[(b, a)] = np.zeros(len(road), dtype=bool)
+			if (b, a) not in self.__in_med_cycle:
+				self.__in_med_cycle[(b, a)] = np.zeros(len(road), dtype=bool)
 		self.__in_med_cycle[(a, b)][i] = True
 		
 
@@ -208,7 +245,7 @@ class RoadsCell(Cell):
 			self.__mark_in_med_cycle(a, b, 0)
 		
 		# Select starting points and grow in first segments
-		starting_points = self.__select_starting_junctions(2)
+		starting_points = self.__select_starting_junctions(self.starting_points)
 		extremities = []
 		for edge in starting_points:
 			a, b = edge
@@ -245,6 +282,13 @@ class RoadsCell(Cell):
 				if self.__is_in_med_cycle(a, b, i):
 					med_cycle.append(road[i])
 		self.med_cycle = util.Polygon(med_cycle)
+		
+		# Flatten terrain
+		self.__original_elevations = dict()
+		for p in self.graph.nodes_iter():
+			self.__original_elevations[p] = self.terrain.elevation_at(*p)
+		for a, b in self.graph.edges_iter():
+			self.terrain.flatten_segment(a, b, self.__original_elevations[a], self.__original_elevations[b])
 		
 		
 	def __grow_from(self, pt):
@@ -408,8 +452,8 @@ class RoadsCell(Cell):
 		a, b = edge
 		polyline = curve.splines.new('POLY')
 		polyline.points.add(1)
-		polyline.points[0].co = (a[0], a[1], self.terrain.elevation_at(*a), 1.0)
-		polyline.points[1].co = (b[0], b[1], self.terrain.elevation_at(*b), 1.0)
+		polyline.points[0].co = (a[0], a[1], self.__original_elevations[a], 1.0)
+		polyline.points[1].co = (b[0], b[1], self.__original_elevations[b], 1.0)
 		
 		curve_obj = bpy.data.objects.new(name + '_curve', curve)
 		curve_obj.parent = parent
@@ -421,7 +465,7 @@ class RoadsCell(Cell):
 		length = util.distance(*edge)
 		segment_length = road.dimensions.x
 
-		extra_length = segment_length * 1.5
+		extra_length = segment_length * 0.7
 		length += extra_length
 		road.location[0] = -extra_length / 2.0
 
@@ -463,26 +507,26 @@ class BlocksCell(RoadsCell):
 	
 		if profile == 'URBAN':
 			self.lot_area_range = (80, 200)
-			self.building_types = ['Skyscraper']
+			self.building_types = ['Skyscraper', 'Office']
 		elif profile == 'SUBURBAN':
 			self.lot_area_range = (100, 150)
-			self.building_types = ['Skyscraper']
+			self.building_types = ['Office', 'House']
 		elif profile == 'RURAL':
 			self.lot_area_range = (100, 200)
-			self.building_types = ['Skyscraper']
+			self.building_types = ['House']
 
 
 	def generate(self):
 		super(BlocksCell, self).generate()
 	
 		# Blocks = areas enclosed by road graph
-		full_graph = self.full_graph_med()
+		full_graph = self.full_graph_low()
 		block_cycles = mcb.planar_graph_cycles(full_graph)
 
 		self.blocks = []
 		for cycle in block_cycles:
 			poly = util.Polygon(cycle)
-			blk = block.CityBlock(self, poly)
+			blk = block.Block(self, poly)
 			blk.generate()
 			self.blocks.append(blk)
 		

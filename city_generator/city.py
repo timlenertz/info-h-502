@@ -39,6 +39,7 @@ class City(object):
 	roads = None # Dict where key = frozenset(A,B), value = list of points forming polyline from road from A to B
 	city_cells = None # List of city cells.
 
+	__original_elevations = None
 
 	def __init__(self):
 		self.terrain = terrain.Terrain()
@@ -205,7 +206,7 @@ class City(object):
 			return citycell.BlocksCell(self, hi_cycle, lo_cycle, 'URBAN')
 		elif remoteness < 0.4:
 			return citycell.BlocksCell(self, hi_cycle, lo_cycle, 'SUBURBAN')
-		elif remoteness < 0.7:
+		elif remoteness < 0.5:
 			return citycell.BlocksCell(self, hi_cycle, lo_cycle, 'RURAL')
 		else:
 			return citycell.LakeCell(self, hi_cycle, lo_cycle)
@@ -262,13 +263,9 @@ class City(object):
 	@staticmethod
 	def __road_length(road):
 		len = 0.0
-		for edge in util.cycle_pairs(road):
+		for edge in util.list_pairs(road):
 			len += util.distance(*edge)
 		return len
-	
-	
-	def __straighten_terrain_for_road(self, key):
-		pass
 
 
 	def __create_blender_curve_for_road(self, parent, name, road):
@@ -278,8 +275,10 @@ class City(object):
 		polyline = curve.splines.new('POLY')
 		polyline.points.add(len(road) - 1)
 		i = 0
-		for x, y in road:
-			z = self.terrain.elevation_at(x, y)
+
+		for p in road:
+			z = self.__original_elevations[p]
+			x, y = p
 			polyline.points[i].co = (x, y, z, 1.0)
 			i += 1
 		
@@ -308,7 +307,23 @@ class City(object):
 		bpy.context.scene.objects.link(road)
 		
 		return road
-			
+
+
+	def full_graph_low(self):
+		graph = nx.Graph()
+		for cell in self.city_cells:
+			cell_graph = cell.full_graph_low()
+			graph = nx.compose(graph, cell_graph)
+		return graph
+	
+	
+	def random_walk(self, n):
+		src = self.intersection_points[self.intersection_point_grid[0, 0]]
+		dst = self.intersection_points[self.intersection_point_grid[-1, -1]]
+		paths = nx.all_simple_paths(self.full_graph_low(), source=src, target=dst)
+		path = next(paths)
+		return path
+					
 			
 	def generate(self):
 		"""Generate internal representation of whole city."""
@@ -321,12 +336,17 @@ class City(object):
 		self.__create_low_level_graph()
 		
 		# Straighten the terrain for the primary roads
+		self.__original_elevations = dict()
 		for key in self.roads:
-			self.__straighten_terrain_for_road(key)
+			for p in self.roads[key]:
+				self.__original_elevations[p] = self.terrain.elevation_at(*p)
+		for key in self.roads:
+			for a, b in util.list_pairs(self.roads[key]):
+				self.terrain.flatten_segment(a, b, self.__original_elevations[a], self.__original_elevations[b])
 			
 		# Create the city cells with their contents
 		self.__create_city_cells()
-	
+			
 	
 	def create_blender_object(self, name):
 		"""Create blender objects for the whole city.
@@ -361,5 +381,8 @@ class City(object):
 			bpy.context.scene.objects.link(cell_parent)
 			cell_parent.parent = root
 			cell.create_blender_object(cell_parent)
+
+		#self.__create_blender_curve_for_road(root, 'random walk', self.random_walk(10))
+
 		
 		return root

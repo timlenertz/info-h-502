@@ -10,11 +10,26 @@ def line_to_point_distance_sq(line, p):
 def line_to_point_distance(line, p):
 	return math.sqrt(line_to_point_distance_sq(line, p))
 
+def length_sq(v):
+	return v[0]**2 + v[1]**2
+
+def length(v):
+	return math.sqrt(length_sq(v))
+
 def distance_sq(a, b):
 	return (a[0] - b[0])**2 + (a[1] - b[1])**2
 
 def distance(a, b):
 	return math.sqrt(distance_sq(a, b))
+
+def near_perpendicular(e1, e2, threshold=0.2):
+	u = (e1[1][0] - e1[0][0], e1[1][1] - e1[0][1])
+	v = (e2[1][0] - e2[0][0], e2[1][1] - e2[0][1])
+	dot = u[0]*v[0] + u[1]*v[1]
+	dot /= length(u)
+	dot /= length(v)
+	return (abs(dot) < 0.2)
+
 	
 def projection_is_on_segment(seg, p, seg_length=None):
 	"""Check if point p projected on line seg is on the segment."""
@@ -78,6 +93,16 @@ def line_intersection_point(l1, l2):
 		return (x, y)
 
 
+def list_pairs(items):
+	"""Generator which yields adjacent pairs of list."""
+	if len(items) <= 1:
+		return
+	prev = items[0]
+	for curr in items[1:]:
+		yield (prev, curr)
+		prev = curr
+
+
 def cycle_pairs(items):
 	"""Generator which yields adjacent pairs of list, followed by one from last item to first."""
 	if len(items) <= 1:
@@ -89,6 +114,40 @@ def cycle_pairs(items):
 	yield (prev, items[0])
 
 
+def turn_direction(a, b, c):
+	ba = (a[0] - b[0], a[1] - b[1])
+	bc = (c[0] - b[0], c[1] - b[1])
+	return ba[0]*bc[1] - ba[1]*bc[0]
+
+
+def convex_hull(points):
+	points.sort(key=lambda p: p[0])
+	upper = []
+	upper.append(points[0])
+	upper.append(points[1])
+	for i in range(2, len(points)):
+		p = points[i]
+		upper.append(p)
+		l = len(upper) - 1
+		while (len(upper) > 2) and (turn_direction(upper[l-2], upper[l-1], upper[l]) > 0):
+			del upper[l - 1]
+			l = len(upper) - 1
+	
+	points.sort(key=lambda p: -p[0])
+	lower = []
+	lower.append(points[0])
+	lower.append(points[1])
+	for i in range(2, len(points)):
+		p = points[i]
+		lower.append(p)
+		l = len(lower) - 1
+		while (len(lower) > 2) and (turn_direction(lower[l-2], lower[l-1], lower[l]) > 0):
+			del lower[l - 1]
+			l = len(lower) - 1
+
+	poly = upper + lower[1:-2]
+	return Polygon(poly)
+			
 
 
 class Polygon:
@@ -217,3 +276,11 @@ class Polygon:
 			if dist_sq < min_dist_sq:
 				min_dist_sq = dist_sq
 		return math.sqrt(min_dist_sq)
+	
+	def maximal_distance(self):
+		max_dist = 0
+		for i, p in enumerate(self.vertices):
+			for q in self.vertices[i+1:]:
+				dist = distance_sq(p, q)
+				max_dist = max(max_dist, dist)
+		return math.sqrt(max_dist)

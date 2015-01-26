@@ -62,17 +62,7 @@ class HeightMap(object):
 			for x in range((y + half)%full, self.image_side_length, full):
 				self.__diamond((x, y), half, d)
 		
-		self.__subdivide(half, d / 2.0)
-	
-	
-	def flatten_segment(self, a, b):
-		pass
-	
-	
-	def flatten_polygon(self, poly):
-		pass
-		
-	
+		self.__subdivide(half, d / 2.0)			
 	
 	def generate(self):
 		self.image_side_length = 2**self.resolution + 1
@@ -105,7 +95,7 @@ class Terrain(HeightMap):
 			vert_y = y * self.pixel_side_length
 			for x in range(0, self.image_side_length):
 				vert_x = x * self.pixel_side_length
-				vert_z = self.height * self.image[y, x]
+				vert_z = self.elevation * self.image[y, x]
 				vert = (vert_x, vert_y, vert_z)
 				vertices.append(vert)
 		
@@ -158,6 +148,9 @@ class Terrain(HeightMap):
 		mtex.use_map_density = True
 		mtex.mapping = 'FLAT'
 		
+		# Add modifier
+		sub_modifier = terrain_obj.modifiers.new("Subdivision Surface", type='SUBSURF')
+		
 		return terrain_obj
 	
 	
@@ -185,3 +178,52 @@ class Terrain(HeightMap):
 		"""Terrain elevation at given terrain coordinates."""
 		x_ind, y_ind = self.to_image(x, y)
 		return self.elevation * self.image[y_ind, x_ind]
+
+	def flatten_segment(self, a, b, a_el=None, b_el=None):
+		ab = (b[0] - a[0], b[1] - a[1])
+		ab_len = math.sqrt(ab[0]**2 + ab[1]**2)
+					
+		w = 4
+		emboss = 0.01 / self.elevation
+		a_i = self.to_image(*a)
+		b_i = self.to_image(*b)
+		
+		if (a_el is None) or (a_el is None):
+			a_el = self.image[a_i[1], a_i[0]]
+			b_el = self.image[b_i[1], b_i[0]]
+		else:
+			a_el /= self.elevation
+			b_el /= self.elevation
+			
+		mn = ( \
+			min(a_i[0] - w, b_i[0] - w), \
+			min(a_i[1] - w, b_i[1] - w) \
+		)
+		mx = ( \
+			max(a_i[0] + w, b_i[0] + w), \
+			max(a_i[1] + w, b_i[1] + w) \
+		)
+		last = self.image_side_length - 1
+		mn = max(mn[0], 0), max(mn[1], 0)
+		mx = min(mx[0], last), min(mx[1], last)
+		
+		def flat_depth(p):
+			ap = (p[0] - a[0], p[1] - a[1])
+			dot = ab[0]*ap[0] + ab[1]*ap[1]
+			ratio = max(min(dot / ab_len**2.0, 1.0), 0.0)
+			interpolated = ratio*a_el + (1.0 - ratio)*b_el
+			return interpolated - emboss
+		
+		for x_i in range(mn[0], mx[0]):
+			for y_i in range(mn[1], mx[1]):
+				p_i = (x_i, y_i)
+				p = self.to_terrain(*p_i)
+				flat = flat_depth(p_i)
+				real = self.image[y_i, x_i]
+				d = abs(util.line_to_point_distance((a, b), p))
+				if d < w * self.pixel_side_length:
+					ratio = d / w
+					ratio = max(0.0, min(ratio, 1.0))**2.0
+					el = ratio*real + (1.0 - ratio)*flat
+					self.image[y_i, x_i] = el
+		
